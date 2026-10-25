@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conteneurs Madina</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout : une scène portuaire animée (bateau → quai → boutiques de Madina), puis un registre à onglets Conteneurs / Clients */
+:root{
+  --bg:#ECEFF1; --surface:#FFFFFF; --ink:#14212B; --muted:#5A6A75; --line:#D2D9DE; --concrete:#C7CED3;
+  --sea:#245A78; --sea-2:#3A7598; --hull:#1B2A35; --sky:#E3E8EB;
+  --c1:#C4532D; --c2:#2C7D69; --c3:#C98F1E; --c4:#3B5A9C;
+  --ok:#2E8549; --warn:#B9800F; --bad:#C0392B;
+  --ok-bg:#E2F1E6; --warn-bg:#F7EDD6; --bad-bg:#F8E2DF;
+  --f-display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E161C; --surface:#162129; --ink:#E2E9EE; --muted:#93A3AE; --line:#29363F; --concrete:#2C3943;
+  --sea:#123247; --sea-2:#1B4660; --hull:#05090C; --sky:#121D24;
+  --c1:#DA6440; --c2:#3A9A82; --c3:#DCA332; --c4:#5C7CC2;
+  --ok:#53B26D; --warn:#E0A93A; --bad:#E8685A;
+  --ok-bg:#16301F; --warn-bg:#33290F; --bad-bg:#3A1A17; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E161C; --surface:#162129; --ink:#E2E9EE; --muted:#93A3AE; --line:#29363F; --concrete:#2C3943;
+  --sea:#123247; --sea-2:#1B4660; --hull:#05090C; --sky:#121D24;
+  --c1:#DA6440; --c2:#3A9A82; --c3:#DCA332; --c4:#5C7CC2;
+  --ok:#53B26D; --warn:#E0A93A; --bad:#E8685A;
+  --ok-bg:#16301F; --warn-bg:#33290F; --bad-bg:#3A1A17; color-scheme:dark}
+
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px;display:grid;gap:28px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:.01em}
+h1{font-size:clamp(2.2rem,5vw,3.4rem);line-height:.95;text-transform:uppercase}
+h2{font-size:1.6rem;text-transform:uppercase}
+h3{font-size:1.15rem;text-transform:uppercase;letter-spacing:.04em}
+.mono{font-family:var(--f-mono)}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.eyebrow{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+header{display:flex;flex-wrap:wrap;gap:16px 32px;align-items:end;justify-content:space-between}
+header p{max-width:60ch;margin:8px 0 0;color:var(--muted)}
+.sample{font-size:.75rem;border:1px dashed var(--line);padding:4px 10px;border-radius:99px;color:var(--muted);white-space:nowrap}
+
+.totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.totals div{background:var(--surface);padding:14px 16px;display:grid;gap:2px}
+.totals strong{font-family:var(--f-display);font-size:1.6rem;font-weight:700;font-variant-numeric:tabular-nums}
+
+.scene-card{background:var(--surface);border:1px solid var(--line);display:grid}
+.scene-bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+.scene-bar .hint{font-size:.85rem;color:var(--muted);min-width:0}
+.scene-scroll{overflow-x:auto}
+svg.scene{display:block;width:100%;min-width:700px;height:auto;background:var(--sky)}
+.btn{font:600 .85rem var(--f-body);border:1px solid var(--ink);background:transparent;color:var(--ink);padding:7px 14px;cursor:pointer}
+.btn:hover{background:var(--ink);color:var(--surface)}
+.btn:disabled{opacity:.4;cursor:default;background:transparent;color:var(--ink)}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--c4);outline-offset:2px}
+
+.sv-label{font:700 13px var(--f-display);letter-spacing:.12em;text-transform:uppercase;fill:var(--muted)}
+.stall{cursor:pointer}
+.stall rect.box{fill:var(--surface);stroke:var(--line)}
+.stall.on rect.box{stroke:var(--ink)}
+.stall text.n{font:600 13px var(--f-body);fill:var(--ink)}
+.stall text.q{font:400 10.5px var(--f-body);fill:var(--muted)}
+.stall{transition:opacity .4s}
+.stall.dim{opacity:.32}
+.ctr{cursor:pointer}
+.ctr text{font:500 8.5px var(--f-mono);fill:#fff;pointer-events:none}
+.ctr.sel rect.body{stroke:var(--ink);stroke-width:2.5}
+.flow{fill:none;stroke-linecap:round;opacity:.5}
+
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--ink)}
+.tab{font:700 1.05rem var(--f-display);text-transform:uppercase;letter-spacing:.06em;padding:10px 18px;border:0;background:transparent;color:var(--muted);cursor:pointer}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+
+.cview{display:grid;grid-template-columns:280px minmax(0,1fr);gap:20px}
+@media (max-width:820px){.cview{grid-template-columns:minmax(0,1fr)}}
+.clist{display:grid;gap:10px;align-content:start}
+.ccard{display:grid;grid-template-columns:10px 1fr;gap:0 12px;text-align:left;background:var(--surface);border:1px solid var(--line);padding:12px 14px 12px 0;cursor:pointer;color:var(--ink);font:inherit}
+.ccard .sw{grid-row:1/4}
+.ccard[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.ccard .code{font:500 .85rem var(--f-mono)}
+.ccard .meta{font-size:.8rem;color:var(--muted)}
+.ccard .res{font-weight:600;font-size:.9rem;font-variant-numeric:tabular-nums}
+
+.detail{background:var(--surface);border:1px solid var(--line);padding:20px;display:grid;grid-template-columns:minmax(0,1fr);gap:22px;min-width:0}
+.dhead{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline;justify-content:space-between}
+.dhead .code{font:500 1.05rem var(--f-mono)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px 20px}
+.kpi{display:grid;gap:2px;border-top:2px solid var(--line);padding-top:8px}
+.kpi strong{font-family:var(--f-display);font-size:1.45rem;font-variant-numeric:tabular-nums;font-weight:700}
+.kpi.good{border-color:var(--ok)} .kpi.good strong{color:var(--ok)}
+.kpi.loss{border-color:var(--bad)} .kpi.loss strong{color:var(--bad)}
+.kpi small{color:var(--muted);font-size:.78rem}
+
+.costbar{display:flex;height:14px;overflow:hidden;background:var(--line)}
+.costbar span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.82rem;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px}
+
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th{text-align:left;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--ink);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--bg)}
+tr.on td{background:var(--bg)}
+.chip{display:inline-block;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.warn{background:var(--warn-bg);color:var(--warn)} .chip.bad{background:var(--bad-bg);color:var(--bad)}
+.cc{display:inline-flex;align-items:center;gap:5px;font:500 .72rem var(--f-mono);margin:0 8px 2px 0;white-space:nowrap}
+.cc i{width:9px;height:9px;display:inline-block}
+.minibar{height:5px;background:var(--line);margin-top:4px;min-width:60px}
+.minibar span{display:block;height:100%;background:var(--ok)}
+.pvt{background:var(--surface);border:1px solid var(--line);padding:20px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;min-width:0}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.step{background:var(--surface);border:1px solid var(--line);padding:14px;display:grid;grid-template-columns:72px minmax(0,1fr);gap:14px;align-items:center}
+.step svg{width:72px;height:54px;display:block}
+.step b{font-family:var(--f-display);font-size:1.1rem;text-transform:uppercase;letter-spacing:.04em;display:block;line-height:1.1}
+.step b em{font-style:normal;color:var(--muted);margin-right:6px}
+.step span{font-size:.85rem;color:var(--muted)}
+.av{display:inline-block;width:36px;height:36px;border-radius:50%;overflow:hidden;flex:none}
+.av svg{display:block;width:100%;height:100%}
+.who{display:flex;gap:10px;align-items:center}
+.pic{display:inline-block;width:20px;height:20px;vertical-align:-5px;margin-right:6px}
+.stall text.s{font:600 10.5px var(--f-body)}
+.cargo text{font:500 11px var(--f-body);fill:var(--ink)}
+.cargo text.t{font:700 11.5px var(--f-display);letter-spacing:.1em;text-transform:uppercase;fill:var(--muted)}
+.owner text{font:600 11px var(--f-body);fill:var(--ink)}
+.owner text.q{font-weight:400;fill:var(--muted);font-size:10px}
+footer{font-size:.8rem;color:var(--muted);max-width:75ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Suivi des imports · Marché de Madina, Conakry</div>
+      <h1>Du bateau<br>au client</h1>
+      <p>Chaque conteneur arrive au port, son contenu part chez plusieurs commerçants, et un même commerçant peut recevoir des produits de plusieurs conteneurs. L'importateur voit, conteneur par conteneur, ce qu'il a gagné ou perdu et qui n'a pas encore payé.</p>
+    </div>
+    <span class="sample">Données d'exemple</span>
+  </header>
+
+  <section class="steps" id="steps" aria-label="Comment lire le schéma"></section>
+
+  <section class="totals" aria-label="Totaux">
+    <div><span class="eyebrow" id="t-cost-l">Investi</span><strong id="t-cost"></strong></div>
+    <div><span class="eyebrow">Ventes</span><strong id="t-sales"></strong></div>
+    <div><span class="eyebrow">Encaissé</span><strong id="t-paid"></strong></div>
+    <div><span class="eyebrow">Reste à percevoir</span><strong id="t-due" style="color:var(--bad)"></strong></div>
+    <div><span class="eyebrow">Résultat à ce jour</span><strong id="t-res"></strong></div>
+  </section>
+
+  <section class="scene-card">
+    <div class="scene-bar">
+      <span class="hint" id="hint">Le navire accoste au port de Conakry…</span>
+      <button class="btn" id="replay" type="button">Rejouer l'arrivée</button>
+    </div>
+    <div class="scene-scroll">
+      <svg class="scene" id="scene" viewBox="0 0 1000 420" role="img" aria-label="Animation : un navire décharge quatre conteneurs au port, puis les marchandises partent vers les boutiques des clients à Madina">
+        <defs>
+          <pattern id="corr" width="5" height="10" patternUnits="userSpaceOnUse"><rect width="2" height="10" fill="#fff" opacity=".16"/></pattern>
+        </defs>
+        <text class="sv-label" x="16" y="24">Rade de Conakry</text>
+        <text class="sv-label" x="378" y="24">Port autonome</text>
+        <text class="sv-label" x="740" y="24">Marché de Madina</text>
+        <!-- mer -->
+        <rect x="0" y="282" width="378" height="138" fill="var(--sea)"/>
+        <g id="waves"><path d="M-60 286 q15 -6 30 0 t30 0 t30 0 t30 0 t30 0 t30 0 t30 0 t30 0 t30 0 t30 0 t30 0 t30 0 t30 0 t30 0 t30 0" fill="none" stroke="var(--sea-2)" stroke-width="3"/></g>
+        <!-- quai -->
+        <rect x="378" y="70" width="122" height="350" fill="var(--concrete)"/>
+        <!-- grue -->
+        <g stroke="var(--muted)" stroke-width="3" fill="none" opacity=".7">
+          <line x1="388" y1="420" x2="388" y2="28"/><line x1="320" y1="30" x2="480" y2="30"/><line x1="388" y1="60" x2="440" y2="30"/>
+        </g>
+        <g class="owner" id="owner"></g>
+        <g class="cargo" id="cargo"></g>
+        <g id="flows"></g>
+        <g id="dots"></g>
+        <!-- navire -->
+        <g id="ship">
+          <path d="M20 250 L360 250 L338 292 L44 292 Z" fill="var(--hull)"/>
+          <rect x="20" y="246" width="340" height="5" fill="var(--c1)" opacity=".9"/>
+          <rect x="28" y="206" width="36" height="42" fill="var(--hull)"/>
+          <rect x="33" y="212" width="26" height="7" fill="var(--sky)"/>
+          <text x="60" y="276" font-family="IBM Plex Mono,monospace" font-size="10" fill="#fff" opacity=".8">MV KALOUM STAR</text>
+        </g>
+        <g id="containers"></g>
+        <g id="stalls"></g>
+      </svg>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:20px">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-c" aria-selected="true" aria-controls="panel-c">Par conteneur</button>
+      <button class="tab" role="tab" id="tab-k" aria-selected="false" aria-controls="panel-k">Par client</button>
+    </div>
+    <div id="panel-c" role="tabpanel" aria-labelledby="tab-c" class="cview">
+      <div class="clist" id="clist"></div>
+      <div class="detail" id="detail"></div>
+    </div>
+    <div id="panel-k" role="tabpanel" aria-labelledby="tab-k" class="pvt" hidden>
+      <div class="dhead"><h3>Commerçants servis</h3><span class="muted" style="font-size:.85rem">Cliquez sur un client pour voir, dans la scène, tous les conteneurs qui l'ont livré.</span></div>
+      <div class="tbl-wrap"><table id="ktable"></table></div>
+    </div>
+  </section>
+
+  <footer>Résultat = ventes − coût de revient du conteneur (achat + fret + dédouanement + manutention). Tant qu'un conteneur n'est pas entièrement vendu, son résultat est provisoire ; le résultat prévu suppose que le stock restant part au prix indiqué. Montants en francs guinéens (GNF).</footer>
+</div>
+
+<script type="module">
+// ---- données : calculées par le backend (GET api/tableau), adaptées aux noms utilisés par l'affichage
+let data;
+try{const r=await fetch('api/tableau');if(!r.ok)throw new Error('HTTP '+r.status);data=await r.json()}
+catch(e){document.querySelector('.wrap').insertAdjacentHTML('afterbegin','<p class="chip bad">Impossible de charger les données (api/tableau). Lancez le backend : voir le README.</p>');throw e}
+const tone={'Soldé':'ok','Partiel':'warn','Impayé':'bad'};
+const status=s=>[tone[s],s];
+const dateFr=new Intl.DateTimeFormat('fr-FR',{day:'numeric',month:'short',year:'numeric'});
+const defaultLook={skin:'#6E4729',head:'none',hc:'#1A1A1A',cloth:'#6F7F8A',awn:'#6F7F8A'};
+const containers=data.conteneurs.map(c=>({id:String(c.id),code:c.code,type:c.type,origin:c.origine,
+  arrival:dateFr.format(new Date(c.arrivee+'T00:00')),status:c.statut,color:`var(--${c.couleur})`,
+  costs:{achat:c.couts.achat,fret:c.couts.fret,douane:c.couts.douane,manut:c.couts.manutention},
+  products:c.produits.map(p=>({id:p.id,name:p.nom,unit:p.unite,qty:p.quantite,price:p.prix,kind:p.illustration,amount:p.montant_vendu})),
+  sold:c.produits.map(p=>p.vendu),cost:c.cout_revient,sales:c.ventes,paid:c.encaisse,due:c.reste,
+  result:c.resultat,stockValue:c.valeur_stock,projected:c.resultat_prevu,late:c.clients_en_retard}));
+const clients=data.clients.map(k=>({id:String(k.id),name:k.nom,place:k.quartier,look:k.apparence||defaultLook,
+  total:k.achete,paid:k.paye,status:k.statut}));
+const byC={},byK={};
+containers.forEach(c=>byC[c.id]={});clients.forEach(k=>byK[k.id]={});
+data.livraisons.forEach(l=>{
+  const cid=String(l.conteneur_id),kid=String(l.client_id),c=containers.find(x=>x.id===cid);
+  const a={amount:l.montant,paid:l.paye,status:l.statut,lines:l.lignes.map(x=>({p:c.products.find(p=>p.id===x.produit_id),q:x.quantite}))};
+  byC[cid][kid]=a;byK[kid][cid]=a;
+});
+const ownerLook={skin:'#6E4729',head:'kufi',hc:'#F2EFE6',cloth:'#2B4A5E'};
+
+// ---- illustrations
+let uid=0;
+function person(l){ // dessin 40×40, découpé en cercle
+  const id='cp'+(uid++);
+  const hats={
+    kufi:`<path d="M12.6 15 Q13 8.3 20 8.3 Q27 8.3 27.4 15 Z" fill="${l.hc}"/><path d="M13 13.4 H27" stroke="rgba(0,0,0,.18)"/>`,
+    turban:`<path d="M11.8 16.5 Q10.5 6.5 20 6 Q29.5 6.5 28.2 16.5 Q20 12 11.8 16.5Z" fill="${l.hc}"/><path d="M13 12 Q20 8.5 27 12" stroke="rgba(0,0,0,.15)" fill="none"/>`,
+    wrap:`<path d="M11.4 18.5 Q9.5 4.5 20 4.5 Q31 4.5 28.6 18.5 Q27.5 11 20 11 Q12.5 11 11.4 18.5Z" fill="${l.hc}"/><circle cx="27.5" cy="6.5" r="3.6" fill="${l.hc}"/><path d="M14 8 Q20 6 26 9" stroke="rgba(0,0,0,.2)" fill="none"/>`,
+    cap:`<path d="M12.8 14.5 Q13 8 20 8 Q27 8 27.2 14.5Z" fill="${l.hc}"/><rect x="24" y="13" width="8" height="2.2" rx="1.1" fill="${l.hc}"/>`,
+    none:`<path d="M12.8 16 Q12.8 9.5 20 9.5 Q27.2 9.5 27.2 16 Q26 12.5 20 12.5 Q14 12.5 12.8 16Z" fill="${l.hc}"/>`};
+  return `<defs><clipPath id="${id}"><circle cx="20" cy="20" r="20"/></clipPath></defs><g clip-path="url(#${id})">
+    <rect width="40" height="40" fill="var(--sky)"/>
+    <path d="M3 44 Q4 27.5 20 26.5 Q36 27.5 37 44 Z" fill="${l.cloth}"/>
+    <path d="M15 28 Q20 34 25 28" stroke="rgba(0,0,0,.25)" stroke-width="1.2" fill="none"/>
+    <path d="M16.5 23 H23.5 V28 Q20 30.5 16.5 28 Z" fill="${l.skin}"/>
+    <ellipse cx="20" cy="18" rx="7.2" ry="8.2" fill="${l.skin}"/>
+    <circle cx="17.3" cy="18.6" r=".9" fill="#1a1a1a"/><circle cx="22.7" cy="18.6" r=".9" fill="#1a1a1a"/>
+    <path d="M17.6 22 Q20 23.8 22.4 22" stroke="#1a1a1a" stroke-width=".8" fill="none"/>
+    ${hats[l.head]||''}</g>`;
+}
+const avatarHTML=l=>`<span class="av" aria-hidden="true"><svg viewBox="0 0 40 40">${person(l)}</svg></span>`;
+function goods(kind){ // dessin 24×24
+  return ({
+    sac:`<path d="M7 6.5 Q12 4 17 6.5 L19.5 20 Q12 22.5 4.5 20 Z" fill="#D9C08C" stroke="#8A6D3B" stroke-width=".8"/><path d="M9 6.5 Q12 9 15 6.5" stroke="#8A6D3B" fill="none"/><rect x="8" y="12" width="8" height="4" fill="#C4532D" opacity=".8"/>`,
+    sucre:`<path d="M7 6.5 Q12 4 17 6.5 L19.5 20 Q12 22.5 4.5 20 Z" fill="#F4F4F0" stroke="#8C979E" stroke-width=".8"/><path d="M9 6.5 Q12 9 15 6.5" stroke="#8C979E" fill="none"/><rect x="8" y="12" width="8" height="4" fill="#3B5A9C"/>`,
+    bidon:`<rect x="5.5" y="6" width="13" height="15.5" rx="2" fill="#E8B923" stroke="#A07C0C" stroke-width=".8"/><rect x="13" y="2.5" width="4" height="4" fill="#C4532D"/><path d="M7.5 8 H11 V11 H7.5Z" fill="#fff" opacity=".55"/>`,
+    carton:`<path d="M3.5 8.5 L12 4.5 L20.5 8.5 L20.5 18.5 L12 22.5 L3.5 18.5 Z" fill="#B98552"/><path d="M3.5 8.5 L12 12.5 L20.5 8.5 M12 12.5 V22.5" stroke="#7A5430" fill="none"/>`,
+    tomate:`<rect x="6" y="5" width="12" height="15" rx="2" fill="#D7D9DB" stroke="#8C979E" stroke-width=".8"/><rect x="6" y="9" width="12" height="7" fill="#C0392B"/><circle cx="12" cy="12.5" r="2.2" fill="#E8573F"/>`,
+    lait:`<rect x="6" y="5" width="12" height="15" rx="2" fill="#EEF2F5" stroke="#3B5A9C" stroke-width=".8"/><rect x="6" y="10" width="12" height="5" fill="#3B5A9C"/>`,
+    pneu:`<circle cx="12" cy="12" r="9.5" fill="#2A2A2A"/><circle cx="12" cy="12" r="9.5" fill="none" stroke="#555" stroke-dasharray="2 2" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="#9AA4AB"/>`,
+    batterie:`<rect x="4" y="8" width="16" height="12" rx="1.5" fill="#3B5A9C"/><rect x="6" y="5" width="3" height="3" fill="#333"/><rect x="15" y="5" width="3" height="3" fill="#C0392B"/><path d="M12 10.5 L10 14.5 H12.5 L11.5 18" stroke="#F0B429" fill="none" stroke-width="1.2"/>`
+  })[kind]||'';
+}
+const goodsHTML=k=>`<svg class="pic" viewBox="0 0 24 24" aria-hidden="true">${goods(k)}</svg>`;
+const $=s=>document.querySelector(s);
+const NS='http://www.w3.org/2000/svg';
+const nf=new Intl.NumberFormat('fr-FR');
+const gnf=n=>nf.format(Math.round(n))+' GNF';
+const short=n=>{const a=Math.abs(n),s=n<0?'−':'';if(a>=1e9)return s+(a/1e9).toFixed(2).replace('.',',')+' Md';if(a>=1e6)return s+(a/1e6).toFixed(1).replace('.',',')+' M';return s+nf.format(a)};
+const signed=n=>(n>0?'+':'')+short(n);
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const costLabels={achat:'Achat marchandise',fret:'Fret maritime',douane:'Dédouanement',manut:'Manutention & transport'};
+const costColors={achat:'var(--ink)',fret:'var(--sea-2)',douane:'var(--c3)',manut:'var(--muted)'};
+
+// ---- totaux
+(()=>{const T=data.totaux;
+ $('#t-cost-l').textContent=`Investi (${containers.length} conteneur${containers.length>1?'s':''})`;
+ $('#t-cost').textContent=short(T.investi);$('#t-sales').textContent=short(T.ventes);
+ $('#t-paid').textContent=short(T.encaisse);$('#t-due').textContent=short(T.reste);
+ const el=$('#t-res');el.textContent=signed(T.resultat);el.style.color=T.resultat>=0?'var(--ok)':'var(--bad)';})();
+
+// ---- scène
+const deckX=[72,140,208,276],deckY=214,quayX=405,quayY=[100,160,220,280],CW=64,CH=34;
+const stallX=740,stallW=248,stallH=50,stallY=i=>40+i*54;
+containers.forEach((c,i)=>{
+  c.deck={x:deckX[i],y:deckY};c.quay={x:quayX,y:quayY[i]};
+  const g=document.createElementNS(NS,'g');g.setAttribute('class','ctr');g.setAttribute('tabindex','0');
+  g.setAttribute('role','button');g.setAttribute('aria-label','Conteneur '+c.code);
+  g.innerHTML=`<rect class="body" width="${CW}" height="${CH}" fill="${c.color}"/><rect width="${CW}" height="${CH}" fill="url(#corr)"/><text x="5" y="14">${c.code.slice(0,4)}</text><text x="5" y="26">${c.code.slice(5,11)}</text>`;
+  g.style.transform=`translate(${c.quay.x}px,${c.quay.y}px)`;
+  g.addEventListener('click',()=>{if(!running){selectContainer(c.id);showTab('c')}});
+  g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();g.dispatchEvent(new Event('click'))}});
+  $('#containers').appendChild(g);c.el=g;
+});
+clients.forEach((k,i)=>{
+  const y=stallY(i);k.y=y;
+  const g=document.createElementNS(NS,'g');g.setAttribute('class','stall');g.setAttribute('tabindex','0');g.setAttribute('role','button');
+  g.setAttribute('aria-label',k.name);
+  const stripes=Array.from({length:8},(_,j)=>`<rect x="${stallX+j*31}" y="${y}" width="31" height="6" fill="${j%2?'var(--surface)':k.look.awn}"/><circle cx="${stallX+j*31+15.5}" cy="${y+6}" r="3.4" fill="${j%2?'var(--surface)':k.look.awn}"/>`).join('');
+  g.innerHTML=`<rect class="box" x="${stallX}" y="${y}" width="${stallW}" height="${stallH}"/>${stripes}
+    <svg x="${stallX+8}" y="${y+11}" width="36" height="36" viewBox="0 0 40 40">${person(k.look)}</svg>
+    <text class="n" x="${stallX+52}" y="${y+28}">${k.name}</text><text class="q" x="${stallX+52}" y="${y+43}">${k.place}</text>
+    <text class="s" x="${stallX+stallW-10}" y="${y+43}" text-anchor="end"></text>`;
+  g.addEventListener('click',()=>{if(!running){selectClient(k.id);showTab('k')}});
+  g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();g.dispatchEvent(new Event('click'))}});
+  $('#stalls').appendChild(g);k.el=g;
+});
+
+$('#owner').innerHTML=`<svg x="384" y="366" width="42" height="42" viewBox="0 0 40 40">${person(ownerLook)}</svg>
+  <text x="432" y="383">Vous,</text><text class="q" x="432" y="397">l'importateur</text>`;
+
+function setStatus(k,s){const t=k.el.querySelector('text.s');if(!s){t.textContent='';return}
+  t.textContent=s[1];t.setAttribute('fill',`var(--${s[0]})`)}
+
+function drawCargo(title,items){
+  const x=512,y=34,w=214,h=30+items.length*24;
+  $('#cargo').innerHTML=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="var(--surface)" stroke="var(--line)" opacity=".95"/>
+    <text class="t" x="${x+10}" y="${y+18}">${title}</text>`+
+    items.map((it,i)=>`<svg x="${x+8}" y="${y+26+i*24}" width="20" height="20" viewBox="0 0 24 24">${goods(it.kind)}</svg><text x="${x+34}" y="${y+40+i*24}">${it.label}</text>`).join('');
+}
+
+const truck=c=>`<g><rect x="-10" y="-7" width="13" height="9" fill="${c}"/><path d="M3 -5 H7.5 L10 -1.5 V2 H3Z" fill="var(--ink)"/><rect x="5" y="-4" width="2.8" height="2.4" fill="var(--sky)"/><circle cx="-6.5" cy="3" r="2" fill="var(--ink)"/><circle cx="6" cy="3" r="2" fill="var(--ink)"/></g>`;
+
+let state={mode:'container',id:containers[0].id},running=false,flows=[];
+function drawFlows(links){
+  $('#flows').innerHTML='';$('#dots').innerHTML='';flows=[];
+  const max=Math.max(...links.map(l=>l.amount),1);
+  links.forEach(l=>{
+    const x1=l.c.quay.x+CW,y1=l.c.quay.y+CH/2,x2=stallX,y2=l.k.y+stallH/2+3;
+    const p=document.createElementNS(NS,'path');
+    p.setAttribute('d',`M${x1} ${y1} C ${x1+130} ${y1}, ${x2-130} ${y2}, ${x2} ${y2}`);
+    p.setAttribute('class','flow');p.setAttribute('stroke',l.c.color);p.setAttribute('stroke-width',(2+6*l.amount/max).toFixed(1));
+    $('#flows').appendChild(p);
+    const len=p.getTotalLength();
+    if(!reduce)p.animate([{strokeDasharray:`0 ${len}`},{strokeDasharray:`${len} ${len}`}],{duration:900,easing:'ease-out'});
+    const dots=[0,1].map(j=>{const d=document.createElementNS(NS,'g');d.innerHTML=truck(l.c.color);$('#dots').appendChild(d);return {d,off:j/2+Math.random()*.15}});
+    flows.push({p,len,dots,speed:.00011+.00005*Math.random()});
+  });
+  placeDots(performance.now());
+}
+function placeDots(t){flows.forEach(f=>f.dots.forEach(o=>{const u=reduce?(o.off+.3)%1:((t*f.speed+o.off)%1);const pt=f.p.getPointAtLength(u*f.len);o.d.setAttribute('transform',`translate(${pt.x.toFixed(1)},${pt.y.toFixed(1)})`)}))}
+(function loop(t){if(!reduce)placeDots(t);requestAnimationFrame(loop)})(0);
+
+function paintScene(){
+  let links=[];
+  if(state.mode==='container'){
+    const c=containers.find(x=>x.id===state.id);
+    links=Object.entries(byC[c.id]).map(([kid,a])=>({c,k:clients.find(k=>k.id===kid),amount:a.amount}));
+    clients.forEach(k=>{const a=byC[c.id][k.id];k.el.classList.toggle('dim',!a);k.el.classList.remove('on');
+      setStatus(k,a?status(a.status):null)});
+    containers.forEach(x=>x.el.classList.toggle('sel',x.id===c.id));
+    drawCargo('Dans '+c.code.slice(0,11),c.products.map(p=>({kind:p.kind,label:`${nf.format(p.qty)} ${p.unit} · ${p.name}`})));
+    const n=links.length,unpaid=c.late;
+    $('#hint').innerHTML=`<b class="mono">${c.code}</b> → ${n} clients · ${unpaid} n'ont pas tout payé`;
+  }else{
+    const k=clients.find(x=>x.id===state.id);
+    links=Object.entries(byK[k.id]).map(([cid,a])=>({c:containers.find(c=>c.id===cid),k,amount:a.amount}));
+    clients.forEach(x=>{x.el.classList.toggle('dim',x.id!==k.id);x.el.classList.toggle('on',x.id===k.id);
+      setStatus(x,x.id===k.id?status(k.status):null)});
+    containers.forEach(x=>x.el.classList.toggle('sel',!!byK[k.id][x.id]));
+    const got={};Object.values(byK[k.id]).forEach(a=>a.lines.forEach(l=>{got[l.p.name]=got[l.p.name]||{p:l.p,q:0};got[l.p.name].q+=l.q}));
+    drawCargo('Reçu par '+k.name.split(' ').slice(-2).join(' '),Object.values(got).map(g=>({kind:g.p.kind,label:`${nf.format(g.q)} ${g.p.unit} · ${g.p.name}`})));
+    $('#hint').innerHTML=`<b>${k.name}</b> a reçu des produits de ${links.length} conteneur${links.length>1?'s':''}`;
+  }
+  drawFlows(links);
+}
+
+// ---- intro
+const tr=(x,y)=>`translate(${x}px,${y}px)`;
+async function intro(){
+  running=true;$('#replay').disabled=true;
+  $('#flows').innerHTML='';$('#dots').innerHTML='';flows=[];
+  clients.forEach(k=>{k.el.classList.add('dim');setStatus(k,null)});
+  $('#cargo').innerHTML='';
+  containers.forEach(c=>c.el.classList.remove('sel'));
+  const ship=$('#ship');
+  if(reduce){containers.forEach(c=>c.el.style.transform=tr(c.quay.x,c.quay.y));ship.style.transform='';finish();return}
+  $('#hint').textContent='Le navire accoste au port de Conakry…';
+  const ease='cubic-bezier(.2,.7,.2,1)',D=2200,off=-430;
+  const anims=[ship.animate([{transform:tr(off,0)},{transform:tr(0,0)}],{duration:D,easing:ease})];
+  containers.forEach(c=>anims.push(c.el.animate([{transform:tr(c.deck.x+off,c.deck.y)},{transform:tr(c.deck.x,c.deck.y)}],{duration:D,easing:ease,fill:'forwards'})));
+  await Promise.all(anims.map(a=>a.finished));
+  $('#hint').textContent='Déchargement des conteneurs sur le quai…';
+  const lifts=containers.map((c,i)=>{
+    const a=c.el.animate([{transform:tr(c.deck.x,c.deck.y)},{transform:tr(c.deck.x,40),offset:.35},{transform:tr(c.quay.x,40),offset:.68},{transform:tr(c.quay.x,c.quay.y)}],{duration:1300,delay:i*500,easing:'ease-in-out',fill:'forwards'});
+    a.finished.then(()=>{c.el.style.transform=tr(c.quay.x,c.quay.y);c.el.getAnimations().forEach(x=>x.cancel())});return a.finished});
+  await Promise.all(lifts);
+  finish();
+}
+function finish(){running=false;$('#replay').disabled=false;paintScene()}
+$('#replay').addEventListener('click',intro);
+
+// ---- panneaux
+function showTab(t){
+  $('#tab-c').setAttribute('aria-selected',t==='c');$('#tab-k').setAttribute('aria-selected',t==='k');
+  $('#panel-c').hidden=t!=='c';$('#panel-k').hidden=t!=='k';
+}
+$('#tab-c').onclick=()=>{showTab('c');if(state.mode!=='container'&&!running)selectContainer(lastC)};
+$('#tab-k').onclick=()=>showTab('k');
+let lastC=containers[0].id;
+
+function renderList(){
+  $('#clist').innerHTML=containers.map(c=>`<button class="ccard" type="button" data-id="${c.id}" aria-pressed="${state.mode==='container'&&state.id===c.id}">
+    <span class="sw" style="background:${c.color}"></span>
+    <span class="code">${c.code}</span>
+    <span class="meta">${c.type} · ${c.origin} · ${c.arrival}</span>
+    <span class="res" style="color:${c.result>=0?'var(--ok)':'var(--bad)'}">${signed(c.result)} GNF${c.status!=='Vendu'?' <span class="muted" style="font-weight:400">(provisoire)</span>':''}</span>
+  </button>`).join('');
+  document.querySelectorAll('.ccard').forEach(b=>b.onclick=()=>{if(!running)selectContainer(b.dataset.id)});
+}
+function renderDetail(c){
+  const resCls=c.result>=0?'good':'loss';
+  const parts=Object.entries(c.costs).map(([k,v])=>`<span style="width:${(v/c.cost*100).toFixed(2)}%;background:${costColors[k]}" title="${costLabels[k]}"></span>`).join('');
+  const leg=Object.entries(c.costs).map(([k,v])=>`<span><i style="background:${costColors[k]}"></i>${costLabels[k]} · <span class="num">${short(v)}</span></span>`).join('');
+  const prod=c.products.map((p,i)=>`<tr><td>${goodsHTML(p.kind)}${p.name}</td><td class="r">${nf.format(p.qty)} ${p.unit}</td><td class="r">${nf.format(c.sold[i])}</td><td class="r">${nf.format(p.qty-c.sold[i])}</td><td class="r">${nf.format(p.price)}</td><td class="r">${nf.format(p.amount)}</td></tr>`).join('');
+  const rows=Object.entries(byC[c.id]).sort((a,b)=>(b[1].amount-b[1].paid)-(a[1].amount-a[1].paid)).map(([kid,a])=>{
+    const k=clients.find(x=>x.id===kid),[cls,lab]=status(a.status);
+    return `<tr><td><div class="who">${avatarHTML(k.look)}<div><b>${k.name}</b><br><span class="muted" style="font-size:.8rem">${k.place}</span></div></div></td>
+    <td>${a.lines.map(l=>`${goodsHTML(l.p.kind)}${nf.format(l.q)} ${l.p.unit} <span class="muted">${l.p.name.split(' ')[0].toLowerCase()}</span>`).join('<br>')}</td>
+    <td class="r">${nf.format(a.amount)}</td><td class="r">${nf.format(a.paid)}<div class="minibar"><span style="width:${a.paid/a.amount*100}%"></span></div></td>
+    <td class="r" style="${a.amount-a.paid>1?'color:var(--bad);font-weight:600':''}">${nf.format(a.amount-a.paid)}</td>
+    <td><span class="chip ${cls}">${lab}</span></td></tr>`}).join('');
+  $('#detail').innerHTML=`
+    <div class="dhead"><div><span class="eyebrow">${c.type} · ${c.origin} · arrivé le ${c.arrival}</span><div class="code">${c.code}</div></div>
+      <span class="chip ${c.status==='Vendu'?'ok':'warn'}">${c.status}</span></div>
+    <div class="kpis">
+      <div class="kpi"><span class="eyebrow">Coût de revient</span><strong>${short(c.cost)}</strong><small>${gnf(c.cost)}</small></div>
+      <div class="kpi"><span class="eyebrow">Ventes</span><strong>${short(c.sales)}</strong><small>${gnf(c.sales)}</small></div>
+      <div class="kpi"><span class="eyebrow">Encaissé</span><strong>${short(c.paid)}</strong><small>${c.sales?Math.round(c.paid/c.sales*100):0} % des ventes</small></div>
+      <div class="kpi ${c.due>1?'loss':''}"><span class="eyebrow">Reste à percevoir</span><strong>${short(c.due)}</strong><small>${c.late} client(s) en retard</small></div>
+      <div class="kpi ${resCls}"><span class="eyebrow">${c.result>=0?'Bénéfice':'Perte'}${c.status!=='Vendu'?' à ce jour':''}</span><strong>${signed(c.result)}</strong><small>${c.stockValue>0?`Prévu si tout est vendu : ${signed(c.projected)}`:`${(c.result/c.cost*100).toFixed(1).replace('.',',')} % du coût`}</small></div>
+    </div>
+    <div><h3 style="margin-bottom:8px">Ce que le conteneur a coûté</h3><div class="costbar">${parts}</div><div class="legend">${leg}</div></div>
+    <div><h3 style="margin-bottom:6px">Contenu</h3><div class="tbl-wrap"><table>
+      <thead><tr><th>Produit</th><th class="r">Reçu</th><th class="r">Vendu</th><th class="r">En stock</th><th class="r">Prix unit. (GNF)</th><th class="r">Ventes (GNF)</th></tr></thead><tbody>${prod}</tbody></table></div></div>
+    <div><h3 style="margin-bottom:6px">Distribution et paiements</h3><div class="tbl-wrap"><table>
+      <thead><tr><th>Client</th><th>Reçu</th><th class="r">Montant (GNF)</th><th class="r">Payé</th><th class="r">Reste</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function renderClients(){
+  const rows=[...clients].sort((a,b)=>(b.total-b.paid)-(a.total-a.paid)).map(k=>{
+    const [cls,lab]=status(k.status);
+    const chips=Object.keys(byK[k.id]).map(cid=>{const c=containers.find(x=>x.id===cid),a=byK[k.id][cid],[s]=status(a.status);
+      return `<span class="cc" title="${a.status}"><i style="background:${c.color}"></i>${c.code.slice(5,11)}${s!=='ok'?` <span style="color:var(--${s})">●</span>`:''}</span>`}).join('');
+    return `<tr class="click ${state.mode==='client'&&state.id===k.id?'on':''}" data-id="${k.id}" tabindex="0"><td><div class="who">${avatarHTML(k.look)}<div><b>${k.name}</b><br><span class="muted" style="font-size:.8rem">${k.place}</span></div></div></td>
+      <td>${chips}</td><td class="r">${nf.format(k.total)}</td><td class="r">${nf.format(k.paid)}</td>
+      <td class="r" style="${k.total-k.paid>1?'color:var(--bad);font-weight:600':''}">${nf.format(k.total-k.paid)}</td><td><span class="chip ${cls}">${lab}</span></td></tr>`}).join('');
+  $('#ktable').innerHTML=`<thead><tr><th>Client</th><th>Conteneurs reçus</th><th class="r">Acheté (GNF)</th><th class="r">Payé</th><th class="r">Doit encore</th><th>Statut</th></tr></thead><tbody>${rows}</tbody>`;
+  document.querySelectorAll('#ktable tr.click').forEach(tr=>{
+    const go=()=>{if(!running)selectClient(tr.dataset.id)};tr.onclick=go;
+    tr.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();go()}}});
+}
+function selectContainer(id){state={mode:'container',id};lastC=id;renderList();renderDetail(containers.find(c=>c.id===id));renderClients();paintScene()}
+function selectClient(id){state={mode:'client',id};renderList();renderClients();paintScene()}
+
+// ---- bande « comment lire »
+(()=>{
+  const nest=(x,y,s,inner,vb=24)=>`<svg x="${x}" y="${y}" width="${s}" height="${s}" viewBox="0 0 ${vb} ${vb}">${inner}</svg>`;
+  const pics=[
+    `<rect x="0" y="40" width="72" height="14" fill="var(--sea)"/><path d="M3 34 H68 L61 45 H10Z" fill="var(--hull)"/><rect x="8" y="21" width="8" height="13" fill="var(--hull)"/>
+     <rect x="19" y="23" width="14" height="11" fill="var(--c1)"/><rect x="34" y="23" width="14" height="11" fill="var(--c2)"/><rect x="49" y="23" width="14" height="11" fill="var(--c3)"/><rect x="34" y="12" width="14" height="11" fill="var(--c4)"/>`,
+    `<rect x="1" y="12" width="34" height="30" fill="var(--c4)"/><path d="M8 12 V42 M15 12 V42 M22 12 V42 M29 12 V42" stroke="#fff" opacity=".2"/><rect x="35" y="12" width="3" height="30" fill="var(--ink)"/>
+     ${nest(40,4,20,goods('sac'))}${nest(52,17,20,goods('bidon'))}${nest(40,30,20,goods('carton'))}`,
+    nest(0,14,30,person(clients[1].look),40)+nest(21,3,30,person(clients[0].look),40)+nest(42,14,30,person(clients[2].look),40),
+    `<rect x="6" y="3" width="42" height="48" fill="var(--surface)" stroke="var(--muted)"/>
+     <circle cx="14" cy="15" r="3.5" fill="var(--ok)"/><path d="M21 15 H42" stroke="var(--line)" stroke-width="3"/>
+     <circle cx="14" cy="27" r="3.5" fill="var(--warn)"/><path d="M21 27 H38" stroke="var(--line)" stroke-width="3"/>
+     <circle cx="14" cy="39" r="3.5" fill="var(--bad)"/><path d="M21 39 H40" stroke="var(--line)" stroke-width="3"/>
+     ${nest(44,26,28,person(ownerLook),40)}`];
+  const txt=[['Le bateau arrive','Chaque conteneur est enregistré avec son coût : achat, fret, douane.'],
+    ['On vide le conteneur','On note les produits et les quantités reçues.'],
+    ['Les clients sont servis','Un même client peut recevoir de plusieurs conteneurs.'],
+    ["On suit l'argent",'Qui a payé, qui doit encore, et le gain ou la perte.']];
+  $('#steps').innerHTML=txt.map((t,i)=>`<div class="step"><svg viewBox="0 0 72 54" aria-hidden="true">${pics[i]}</svg><div><b><em>${i+1}</em>${t[0]}</b><span>${t[1]}</span></div></div>`).join('');
+})();
+
+renderList();renderDetail(containers[0]);renderClients();
+intro();
+</script>
+</html>
