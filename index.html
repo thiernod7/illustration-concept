@@ -148,7 +148,7 @@ footer{font-size:.8rem;color:var(--muted);max-width:75ch}
   <section class="steps" id="steps" aria-label="Comment lire le schéma"></section>
 
   <section class="totals" aria-label="Totaux">
-    <div><span class="eyebrow" id="t-cost-l">Investi</span><strong id="t-cost"></strong></div>
+    <div><span class="eyebrow">Investi (4 conteneurs)</span><strong id="t-cost"></strong></div>
     <div><span class="eyebrow">Ventes</span><strong id="t-sales"></strong></div>
     <div><span class="eyebrow">Encaissé</span><strong id="t-paid"></strong></div>
     <div><span class="eyebrow">Reste à percevoir</span><strong id="t-due" style="color:var(--bad)"></strong></div>
@@ -213,31 +213,33 @@ footer{font-size:.8rem;color:var(--muted);max-width:75ch}
   <footer>Résultat = ventes − coût de revient du conteneur (achat + fret + dédouanement + manutention). Tant qu'un conteneur n'est pas entièrement vendu, son résultat est provisoire ; le résultat prévu suppose que le stock restant part au prix indiqué. Montants en francs guinéens (GNF).</footer>
 </div>
 
-<script type="module">
-// ---- données : calculées par le backend (GET api/tableau), adaptées aux noms utilisés par l'affichage
-let data;
-try{const r=await fetch('api/tableau');if(!r.ok)throw new Error('HTTP '+r.status);data=await r.json()}
-catch(e){document.querySelector('.wrap').insertAdjacentHTML('afterbegin','<p class="chip bad">Impossible de charger les données (api/tableau). Lancez le backend : voir le README.</p>');throw e}
-const tone={'Soldé':'ok','Partiel':'warn','Impayé':'bad'};
-const status=s=>[tone[s],s];
-const dateFr=new Intl.DateTimeFormat('fr-FR',{day:'numeric',month:'short',year:'numeric'});
-const defaultLook={skin:'#6E4729',head:'none',hc:'#1A1A1A',cloth:'#6F7F8A',awn:'#6F7F8A'};
-const containers=data.conteneurs.map(c=>({id:String(c.id),code:c.code,type:c.type,origin:c.origine,
-  arrival:dateFr.format(new Date(c.arrivee+'T00:00')),status:c.statut,color:`var(--${c.couleur})`,
-  costs:{achat:c.couts.achat,fret:c.couts.fret,douane:c.couts.douane,manut:c.couts.manutention},
-  products:c.produits.map(p=>({id:p.id,name:p.nom,unit:p.unite,qty:p.quantite,price:p.prix,kind:p.illustration,amount:p.montant_vendu})),
-  sold:c.produits.map(p=>p.vendu),cost:c.cout_revient,sales:c.ventes,paid:c.encaisse,due:c.reste,
-  result:c.resultat,stockValue:c.valeur_stock,projected:c.resultat_prevu,late:c.clients_en_retard}));
-const clients=data.clients.map(k=>({id:String(k.id),name:k.nom,place:k.quartier,look:k.apparence||defaultLook,
-  total:k.achete,paid:k.paye,status:k.statut}));
-const byC={},byK={};
-containers.forEach(c=>byC[c.id]={});clients.forEach(k=>byK[k.id]={});
-data.livraisons.forEach(l=>{
-  const cid=String(l.conteneur_id),kid=String(l.client_id),c=containers.find(x=>x.id===cid);
-  const a={amount:l.montant,paid:l.paye,status:l.statut,lines:l.lignes.map(x=>({p:c.products.find(p=>p.id===x.produit_id),q:x.quantite}))};
-  byC[cid][kid]=a;byK[kid][cid]=a;
-});
+<script>
+const containers=[
+ {id:'C1',code:'MDNU 482113 0',type:"40' HC",origin:'Guangzhou, Chine',arrival:'28 juil. 2026',status:'Vendu',color:'var(--c1)',
+  costs:{achat:290e6,fret:48e6,douane:22e6,manut:6e6},
+  products:[{name:'Riz parfumé 25 kg',unit:'sacs',qty:1000,price:285000},{name:'Huile végétale 20 L',unit:'bidons',qty:300,price:390000}]},
+ {id:'C2',code:'MDNU 517390 4',type:"20' DV",origin:'Mersin, Turquie',arrival:'21 août 2026',status:'Vendu',color:'var(--c2)',
+  costs:{achat:98e6,fret:28e6,douane:9e6,manut:3e6},
+  products:[{name:'Pâtes alimentaires 500 g',unit:'cartons',qty:800,price:95000},{name:'Tomate concentrée',unit:'cartons',qty:600,price:120000}]},
+ {id:'C3',code:'MDNU 603218 7',type:"40' DV",origin:'Jebel Ali, Dubaï',arrival:'10 sept. 2026',status:'Vendu',color:'var(--c3)',
+  costs:{achat:150e6,fret:34e6,douane:14e6,manut:5e6},
+  products:[{name:'Pneus moto 2.75-17',unit:'pièces',qty:900,price:160000},{name:'Batteries 12 V',unit:'pièces',qty:400,price:210000}]},
+ {id:'C4',code:'MDNU 640055 2',type:"40' HC",origin:'Ningbo, Chine',arrival:'18 oct. 2026',status:'En distribution',color:'var(--c4)',
+  costs:{achat:290e6,fret:46e6,douane:20e6,manut:6e6},
+  products:[{name:'Sucre 50 kg',unit:'sacs',qty:700,price:420000},{name:'Lait en poudre',unit:'cartons',qty:400,price:260000}]},
+];
+const clients=[
+ {id:'k1',name:'El Hadj Mamadou Bah',place:'Madina Marché',look:{skin:'#6B4423',head:'turban',hc:'#F2EFE6',cloth:'#E6E0D0',awn:'#2C7D69'}},
+ {id:'k2',name:'Fatoumata Camara',place:'Madina Rail',look:{skin:'#8A5A3B',head:'wrap',hc:'#D9532B',cloth:'#F0B429',awn:'#D9532B'}},
+ {id:'k3',name:'Ibrahima Sow',place:'Koloma',look:{skin:'#5A3A22',head:'kufi',hc:'#3B5A9C',cloth:'#4A6BB0',awn:'#3B5A9C'}},
+ {id:'k4',name:'Mariama Diallo',place:'Matoto',look:{skin:'#7A4E2F',head:'wrap',hc:'#7B3FA0',cloth:'#2E8B7A',awn:'#7B3FA0'}},
+ {id:'k5',name:'Oumar Kouyaté',place:'Kaloum',look:{skin:'#4E321D',head:'none',hc:'#1A1A1A',cloth:'#C98F1E',awn:'#C98F1E'}},
+ {id:'k6',name:'Aïssatou Barry',place:'Madina Dispensaire',look:{skin:'#93613F',head:'wrap',hc:'#2C7D69',cloth:'#C4532D',awn:'#2C7D69'}},
+ {id:'k7',name:'Moussa Keïta',place:'Bonfi',look:{skin:'#62402A',head:'cap',hc:'#24323D',cloth:'#6F7F8A',awn:'#C4532D'}},
+];
 const ownerLook={skin:'#6E4729',head:'kufi',hc:'#F2EFE6',cloth:'#2B4A5E'};
+// type d'illustration par produit
+const kinds={'Riz parfumé 25 kg':'sac','Huile végétale 20 L':'bidon','Pâtes alimentaires 500 g':'carton','Tomate concentrée':'tomate','Pneus moto 2.75-17':'pneu','Batteries 12 V':'batterie','Sucre 50 kg':'sucre','Lait en poudre':'lait'};
 
 // ---- illustrations
 let uid=0;
@@ -273,6 +275,14 @@ function goods(kind){ // dessin 24×24
   })[kind]||'';
 }
 const goodsHTML=k=>`<svg class="pic" viewBox="0 0 24 24" aria-hidden="true">${goods(k)}</svg>`;
+// [conteneur, client, produit, quantité, part payée]
+const sales=[
+ ['C1','k1',0,300,1],['C1','k2',0,250,.6],['C1','k2',1,90,.6],['C1','k3',0,250,1],['C1','k6',0,200,1],['C1','k4',1,200,0],
+ ['C2','k5',0,300,1],['C2','k1',0,250,1],['C2','k7',0,150,.5],['C2','k5',1,200,1],['C2','k7',1,250,.5],['C2','k2',1,100,0],
+ ['C3','k7',0,400,.75],['C3','k3',0,300,1],['C3','k4',0,150,0],['C3','k7',1,200,.75],['C3','k3',1,150,1],
+ ['C4','k1',0,200,.5],['C4','k6',0,150,0],['C4','k2',0,120,.3],['C4','k6',1,100,0],['C4','k4',1,80,0],
+];
+
 const $=s=>document.querySelector(s);
 const NS='http://www.w3.org/2000/svg';
 const nf=new Intl.NumberFormat('fr-FR');
@@ -283,12 +293,33 @@ const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const costLabels={achat:'Achat marchandise',fret:'Fret maritime',douane:'Dédouanement',manut:'Manutention & transport'};
 const costColors={achat:'var(--ink)',fret:'var(--sea-2)',douane:'var(--c3)',manut:'var(--muted)'};
 
+// ---- calculs
+const byC={},byK={};
+containers.forEach(c=>{
+  c.cost=Object.values(c.costs).reduce((a,b)=>a+b,0);
+  c.sold=c.products.map(()=>0);c.sales=0;c.paid=0;byC[c.id]={};
+});
+clients.forEach(k=>{byK[k.id]={};k.total=0;k.paid=0});
+sales.forEach(([cid,kid,pi,q,f])=>{
+  const c=containers.find(x=>x.id===cid),amt=q*c.products[pi].price,paid=amt*f;
+  c.sold[pi]+=q;c.sales+=amt;c.paid+=paid;
+  const a=byC[cid][kid]||(byC[cid][kid]={amount:0,paid:0,lines:[]});
+  a.amount+=amt;a.paid+=paid;a.lines.push({p:c.products[pi],q});
+  byK[kid][cid]=a;
+  const k=clients.find(x=>x.id===kid);k.total+=amt;k.paid+=paid;
+});
+containers.forEach(c=>{
+  c.result=c.sales-c.cost;c.due=c.sales-c.paid;
+  c.stockValue=c.products.reduce((s,p,i)=>s+(p.qty-c.sold[i])*p.price,0);
+  c.projected=c.result+c.stockValue;
+});
+const status=(amt,paid)=>paid>=amt-1?['ok','Soldé']:paid>0?['warn','Partiel']:['bad','Impayé'];
+
 // ---- totaux
-(()=>{const T=data.totaux;
- $('#t-cost-l').textContent=`Investi (${containers.length} conteneur${containers.length>1?'s':''})`;
- $('#t-cost').textContent=short(T.investi);$('#t-sales').textContent=short(T.ventes);
- $('#t-paid').textContent=short(T.encaisse);$('#t-due').textContent=short(T.reste);
- const el=$('#t-res');el.textContent=signed(T.resultat);el.style.color=T.resultat>=0?'var(--ok)':'var(--bad)';})();
+(()=>{const T=k=>containers.reduce((s,c)=>s+c[k],0);
+ $('#t-cost').textContent=short(T('cost'));$('#t-sales').textContent=short(T('sales'));
+ $('#t-paid').textContent=short(T('paid'));$('#t-due').textContent=short(T('due'));
+ const r=T('result');const el=$('#t-res');el.textContent=signed(r);el.style.color=r>=0?'var(--ok)':'var(--bad)';})();
 
 // ---- scène
 const deckX=[72,140,208,276],deckY=214,quayX=405,quayY=[100,160,220,280],CW=64,CH=34;
@@ -332,7 +363,7 @@ function drawCargo(title,items){
 
 const truck=c=>`<g><rect x="-10" y="-7" width="13" height="9" fill="${c}"/><path d="M3 -5 H7.5 L10 -1.5 V2 H3Z" fill="var(--ink)"/><rect x="5" y="-4" width="2.8" height="2.4" fill="var(--sky)"/><circle cx="-6.5" cy="3" r="2" fill="var(--ink)"/><circle cx="6" cy="3" r="2" fill="var(--ink)"/></g>`;
 
-let state={mode:'container',id:containers[0].id},running=false,flows=[];
+let state={mode:'container',id:'C1'},running=false,flows=[];
 function drawFlows(links){
   $('#flows').innerHTML='';$('#dots').innerHTML='';flows=[];
   const max=Math.max(...links.map(l=>l.amount),1);
@@ -358,19 +389,19 @@ function paintScene(){
     const c=containers.find(x=>x.id===state.id);
     links=Object.entries(byC[c.id]).map(([kid,a])=>({c,k:clients.find(k=>k.id===kid),amount:a.amount}));
     clients.forEach(k=>{const a=byC[c.id][k.id];k.el.classList.toggle('dim',!a);k.el.classList.remove('on');
-      setStatus(k,a?status(a.status):null)});
+      setStatus(k,a?status(a.amount,a.paid):null)});
     containers.forEach(x=>x.el.classList.toggle('sel',x.id===c.id));
-    drawCargo('Dans '+c.code.slice(0,11),c.products.map(p=>({kind:p.kind,label:`${nf.format(p.qty)} ${p.unit} · ${p.name}`})));
-    const n=links.length,unpaid=c.late;
+    drawCargo('Dans '+c.code.slice(0,11),c.products.map(p=>({kind:kinds[p.name],label:`${nf.format(p.qty)} ${p.unit} · ${p.name}`})));
+    const n=links.length,unpaid=Object.values(byC[c.id]).filter(a=>a.paid<a.amount-1).length;
     $('#hint').innerHTML=`<b class="mono">${c.code}</b> → ${n} clients · ${unpaid} n'ont pas tout payé`;
   }else{
     const k=clients.find(x=>x.id===state.id);
     links=Object.entries(byK[k.id]).map(([cid,a])=>({c:containers.find(c=>c.id===cid),k,amount:a.amount}));
     clients.forEach(x=>{x.el.classList.toggle('dim',x.id!==k.id);x.el.classList.toggle('on',x.id===k.id);
-      setStatus(x,x.id===k.id?status(k.status):null)});
+      setStatus(x,x.id===k.id?status(k.total,k.paid):null)});
     containers.forEach(x=>x.el.classList.toggle('sel',!!byK[k.id][x.id]));
     const got={};Object.values(byK[k.id]).forEach(a=>a.lines.forEach(l=>{got[l.p.name]=got[l.p.name]||{p:l.p,q:0};got[l.p.name].q+=l.q}));
-    drawCargo('Reçu par '+k.name.split(' ').slice(-2).join(' '),Object.values(got).map(g=>({kind:g.p.kind,label:`${nf.format(g.q)} ${g.p.unit} · ${g.p.name}`})));
+    drawCargo('Reçu par '+k.name.split(' ').slice(-2).join(' '),Object.values(got).map(g=>({kind:kinds[g.p.name],label:`${nf.format(g.q)} ${g.p.unit} · ${g.p.name}`})));
     $('#hint').innerHTML=`<b>${k.name}</b> a reçu des produits de ${links.length} conteneur${links.length>1?'s':''}`;
   }
   drawFlows(links);
@@ -408,7 +439,7 @@ function showTab(t){
 }
 $('#tab-c').onclick=()=>{showTab('c');if(state.mode!=='container'&&!running)selectContainer(lastC)};
 $('#tab-k').onclick=()=>showTab('k');
-let lastC=containers[0].id;
+let lastC='C1';
 
 function renderList(){
   $('#clist').innerHTML=containers.map(c=>`<button class="ccard" type="button" data-id="${c.id}" aria-pressed="${state.mode==='container'&&state.id===c.id}">
@@ -423,11 +454,11 @@ function renderDetail(c){
   const resCls=c.result>=0?'good':'loss';
   const parts=Object.entries(c.costs).map(([k,v])=>`<span style="width:${(v/c.cost*100).toFixed(2)}%;background:${costColors[k]}" title="${costLabels[k]}"></span>`).join('');
   const leg=Object.entries(c.costs).map(([k,v])=>`<span><i style="background:${costColors[k]}"></i>${costLabels[k]} · <span class="num">${short(v)}</span></span>`).join('');
-  const prod=c.products.map((p,i)=>`<tr><td>${goodsHTML(p.kind)}${p.name}</td><td class="r">${nf.format(p.qty)} ${p.unit}</td><td class="r">${nf.format(c.sold[i])}</td><td class="r">${nf.format(p.qty-c.sold[i])}</td><td class="r">${nf.format(p.price)}</td><td class="r">${nf.format(p.amount)}</td></tr>`).join('');
+  const prod=c.products.map((p,i)=>`<tr><td>${goodsHTML(kinds[p.name])}${p.name}</td><td class="r">${nf.format(p.qty)} ${p.unit}</td><td class="r">${nf.format(c.sold[i])}</td><td class="r">${nf.format(p.qty-c.sold[i])}</td><td class="r">${nf.format(p.price)}</td><td class="r">${nf.format(c.sold[i]*p.price)}</td></tr>`).join('');
   const rows=Object.entries(byC[c.id]).sort((a,b)=>(b[1].amount-b[1].paid)-(a[1].amount-a[1].paid)).map(([kid,a])=>{
-    const k=clients.find(x=>x.id===kid),[cls,lab]=status(a.status);
+    const k=clients.find(x=>x.id===kid),[cls,lab]=status(a.amount,a.paid);
     return `<tr><td><div class="who">${avatarHTML(k.look)}<div><b>${k.name}</b><br><span class="muted" style="font-size:.8rem">${k.place}</span></div></div></td>
-    <td>${a.lines.map(l=>`${goodsHTML(l.p.kind)}${nf.format(l.q)} ${l.p.unit} <span class="muted">${l.p.name.split(' ')[0].toLowerCase()}</span>`).join('<br>')}</td>
+    <td>${a.lines.map(l=>`${goodsHTML(kinds[l.p.name])}${nf.format(l.q)} ${l.p.unit} <span class="muted">${l.p.name.split(' ')[0].toLowerCase()}</span>`).join('<br>')}</td>
     <td class="r">${nf.format(a.amount)}</td><td class="r">${nf.format(a.paid)}<div class="minibar"><span style="width:${a.paid/a.amount*100}%"></span></div></td>
     <td class="r" style="${a.amount-a.paid>1?'color:var(--bad);font-weight:600':''}">${nf.format(a.amount-a.paid)}</td>
     <td><span class="chip ${cls}">${lab}</span></td></tr>`}).join('');
@@ -437,8 +468,8 @@ function renderDetail(c){
     <div class="kpis">
       <div class="kpi"><span class="eyebrow">Coût de revient</span><strong>${short(c.cost)}</strong><small>${gnf(c.cost)}</small></div>
       <div class="kpi"><span class="eyebrow">Ventes</span><strong>${short(c.sales)}</strong><small>${gnf(c.sales)}</small></div>
-      <div class="kpi"><span class="eyebrow">Encaissé</span><strong>${short(c.paid)}</strong><small>${c.sales?Math.round(c.paid/c.sales*100):0} % des ventes</small></div>
-      <div class="kpi ${c.due>1?'loss':''}"><span class="eyebrow">Reste à percevoir</span><strong>${short(c.due)}</strong><small>${c.late} client(s) en retard</small></div>
+      <div class="kpi"><span class="eyebrow">Encaissé</span><strong>${short(c.paid)}</strong><small>${Math.round(c.paid/c.sales*100)} % des ventes</small></div>
+      <div class="kpi ${c.due>1?'loss':''}"><span class="eyebrow">Reste à percevoir</span><strong>${short(c.due)}</strong><small>${Object.values(byC[c.id]).filter(a=>a.paid<a.amount-1).length} client(s) en retard</small></div>
       <div class="kpi ${resCls}"><span class="eyebrow">${c.result>=0?'Bénéfice':'Perte'}${c.status!=='Vendu'?' à ce jour':''}</span><strong>${signed(c.result)}</strong><small>${c.stockValue>0?`Prévu si tout est vendu : ${signed(c.projected)}`:`${(c.result/c.cost*100).toFixed(1).replace('.',',')} % du coût`}</small></div>
     </div>
     <div><h3 style="margin-bottom:8px">Ce que le conteneur a coûté</h3><div class="costbar">${parts}</div><div class="legend">${leg}</div></div>
@@ -449,9 +480,9 @@ function renderDetail(c){
 }
 function renderClients(){
   const rows=[...clients].sort((a,b)=>(b.total-b.paid)-(a.total-a.paid)).map(k=>{
-    const [cls,lab]=status(k.status);
-    const chips=Object.keys(byK[k.id]).map(cid=>{const c=containers.find(x=>x.id===cid),a=byK[k.id][cid],[s]=status(a.status);
-      return `<span class="cc" title="${a.status}"><i style="background:${c.color}"></i>${c.code.slice(5,11)}${s!=='ok'?` <span style="color:var(--${s})">●</span>`:''}</span>`}).join('');
+    const [cls,lab]=status(k.total,k.paid);
+    const chips=Object.keys(byK[k.id]).map(cid=>{const c=containers.find(x=>x.id===cid),a=byK[k.id][cid],[s]=status(a.amount,a.paid);
+      return `<span class="cc" title="${status(a.amount,a.paid)[1]}"><i style="background:${c.color}"></i>${c.code.slice(5,11)}${s!=='ok'?` <span style="color:var(--${s})">●</span>`:''}</span>`}).join('');
     return `<tr class="click ${state.mode==='client'&&state.id===k.id?'on':''}" data-id="${k.id}" tabindex="0"><td><div class="who">${avatarHTML(k.look)}<div><b>${k.name}</b><br><span class="muted" style="font-size:.8rem">${k.place}</span></div></div></td>
       <td>${chips}</td><td class="r">${nf.format(k.total)}</td><td class="r">${nf.format(k.paid)}</td>
       <td class="r" style="${k.total-k.paid>1?'color:var(--bad);font-weight:600':''}">${nf.format(k.total-k.paid)}</td><td><span class="chip ${cls}">${lab}</span></td></tr>`}).join('');

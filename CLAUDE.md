@@ -59,9 +59,3 @@ Toute l'interface et les textes sont en **français**.
 
 ## Stack du développeur
 Python, Django, FastAPI, React.js, React Native, Tailwind CSS.
-
-## Stack du projet (illustration du concept)
-- **Backend** : FastAPI + SQLite (`backend/`). Toutes les règles de calcul vivent dans `backend/app/calculs.py` ; montants en GNF **entiers**.
-- **Frontend** : la page du prototype (`frontend/index.html`), sans build ; elle lit `GET api/tableau` et ne fait qu'afficher.
-- **Paiements** : un paiement est réparti sur les ventes via la table `affectation` (les plus anciennes d'abord). Le prix est figé sur la vente.
-- **CI / déploiement** : GitHub Actions lance `pytest`, puis publie une version statique en lecture seule sur GitHub Pages (`scripts/export_static.py`).
