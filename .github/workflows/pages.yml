@@ -2,7 +2,6 @@ name: Déploiement de la maquette
 
 on:
   push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +15,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Publie depuis la branche par défaut du dépôt, quel que soit son nom.
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     environment:
       name: github-pages
