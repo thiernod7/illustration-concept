@@ -131,6 +131,33 @@ tr.on td{background:var(--bg)}
 .cargo text.t{font:700 11.5px var(--f-display);letter-spacing:.1em;text-transform:uppercase;fill:var(--muted)}
 .owner text{font:600 11px var(--f-body);fill:var(--ink)}
 .owner text.q{font-weight:400;fill:var(--muted);font-size:10px}
+/* fil d'Ariane et vue « ce client dans ce conteneur » */
+.crumbs ol{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px 4px;font-size:.88rem}
+.crumbs li{display:flex;align-items:center;gap:4px;min-width:0}
+.crumbs li+li::before{content:"›";color:var(--muted);margin-right:4px;font-size:1.1rem}
+.crumbs button,.crumbs [aria-current]{display:inline-flex;align-items:center;gap:7px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);padding:4px 10px 4px 6px;min-height:34px}
+.crumbs button{cursor:pointer;color:var(--muted)} .crumbs button:hover{color:var(--ink);border-color:var(--ink)}
+.crumbs [aria-current]{border-color:var(--ink);font-weight:600}
+.crumbs .sw{width:12px;height:20px;flex:none} .crumbs .av{width:24px;height:24px}
+.crumbs .lead{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-right:4px}
+.crumbs .pic{margin:0}
+.route{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.route .box{width:58px;height:36px;display:grid;place-items:center;color:#fff;font:500 .62rem var(--f-mono);line-height:1.1;text-align:center}
+.route svg.trk{width:44px;height:22px}
+.route .av{width:44px;height:44px}
+.takes{display:grid;gap:12px}
+.take{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:6px 16px;align-items:center;border:1px solid var(--line);border-left:6px solid var(--cc);padding:14px 16px}
+@media (max-width:560px){.take{grid-template-columns:44px minmax(0,1fr)}.take .money{grid-column:1/-1;text-align:left}}
+.take .big{width:52px;height:52px}
+.take b{font-size:1rem}
+.take .money{text-align:right;font-variant-numeric:tabular-nums;display:grid;gap:4px;justify-items:end}
+@media (max-width:560px){.take .money{justify-items:start}}
+.picto{display:flex;flex-wrap:wrap;gap:3px;margin:8px 0 2px}
+.picto svg{width:22px;height:22px}
+.picto svg.off{opacity:.18;filter:grayscale(1)}
+.picto-note{font-size:.76rem;color:var(--muted)}
+.cc.go{cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:3px 7px}
+.cc.go:hover{border-color:var(--ink)}
 footer{font-size:.8rem;color:var(--muted);max-width:75ch}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -196,6 +223,7 @@ footer{font-size:.8rem;color:var(--muted);max-width:75ch}
   </section>
 
   <section style="display:grid;gap:20px">
+    <nav class="crumbs" id="crumbs" aria-label="Fil d'Ariane"></nav>
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" id="tab-c" aria-selected="true" aria-controls="panel-c">Par conteneur</button>
       <button class="tab" role="tab" id="tab-k" aria-selected="false" aria-controls="panel-k">Par client</button>
@@ -304,7 +332,7 @@ sales.forEach(([cid,kid,pi,q,f])=>{
   const c=containers.find(x=>x.id===cid),amt=q*c.products[pi].price,paid=amt*f;
   c.sold[pi]+=q;c.sales+=amt;c.paid+=paid;
   const a=byC[cid][kid]||(byC[cid][kid]={amount:0,paid:0,lines:[]});
-  a.amount+=amt;a.paid+=paid;a.lines.push({p:c.products[pi],q});
+  a.amount+=amt;a.paid+=paid;a.lines.push({p:c.products[pi],q,amt,paid});
   byK[kid][cid]=a;
   const k=clients.find(x=>x.id===kid);k.total+=amt;k.paid+=paid;
 });
@@ -330,7 +358,7 @@ containers.forEach((c,i)=>{
   g.setAttribute('role','button');g.setAttribute('aria-label','Conteneur '+c.code);
   g.innerHTML=`<rect class="body" width="${CW}" height="${CH}" fill="${c.color}"/><rect width="${CW}" height="${CH}" fill="url(#corr)"/><text x="5" y="14">${c.code.slice(0,4)}</text><text x="5" y="26">${c.code.slice(5,11)}</text>`;
   g.style.transform=`translate(${c.quay.x}px,${c.quay.y}px)`;
-  g.addEventListener('click',()=>{if(!running){selectContainer(c.id);showTab('c')}});
+  g.addEventListener('click',()=>{if(running)return;if(state.mode==='client'&&byK[state.id][c.id])selectPair(c.id,state.id,'k');else selectContainer(c.id);showTab('c')});
   g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();g.dispatchEvent(new Event('click'))}});
   $('#containers').appendChild(g);c.el=g;
 });
@@ -343,7 +371,7 @@ clients.forEach((k,i)=>{
     <svg x="${stallX+8}" y="${y+11}" width="36" height="36" viewBox="0 0 40 40">${person(k.look)}</svg>
     <text class="n" x="${stallX+52}" y="${y+28}">${k.name}</text><text class="q" x="${stallX+52}" y="${y+43}">${k.place}</text>
     <text class="s" x="${stallX+stallW-10}" y="${y+43}" text-anchor="end"></text>`;
-  g.addEventListener('click',()=>{if(!running){selectClient(k.id);showTab('k')}});
+  g.addEventListener('click',()=>{if(running)return;if(state.mode==='container'&&byC[state.id][k.id]){selectPair(state.id,k.id,'c');showTab('c')}else{selectClient(k.id);showTab('k')}});
   g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();g.dispatchEvent(new Event('click'))}});
   $('#stalls').appendChild(g);k.el=g;
 });
@@ -394,6 +422,14 @@ function paintScene(){
     drawCargo('Dans '+c.code.slice(0,11),c.products.map(p=>({kind:kinds[p.name],label:`${nf.format(p.qty)} ${p.unit} · ${p.name}`})));
     const n=links.length,unpaid=Object.values(byC[c.id]).filter(a=>a.paid<a.amount-1).length;
     $('#hint').innerHTML=`<b class="mono">${c.code}</b> → ${n} clients · ${unpaid} n'ont pas tout payé`;
+  }else if(state.mode==='pair'){
+    const c=containers.find(x=>x.id===state.cid),k=clients.find(x=>x.id===state.kid),a=byC[c.id][k.id];
+    links=[{c,k,amount:a.amount}];
+    clients.forEach(x=>{x.el.classList.toggle('dim',x.id!==k.id);x.el.classList.toggle('on',x.id===k.id);
+      setStatus(x,x.id===k.id?status(a.amount,a.paid):null)});
+    containers.forEach(x=>x.el.classList.toggle('sel',x.id===c.id));
+    drawCargo(c.code.slice(5,11)+' → '+k.name.split(' ').slice(-1),takes(a).map(t=>({kind:kinds[t.p.name],label:`${nf.format(t.q)} ${t.p.unit} · ${t.p.name}`})));
+    $('#hint').innerHTML=`<b>${k.name}</b> a pris ${takes(a).length} produit${takes(a).length>1?'s':''} du conteneur <b class="mono">${c.code}</b>`;
   }else{
     const k=clients.find(x=>x.id===state.id);
     links=Object.entries(byK[k.id]).map(([cid,a])=>({c:containers.find(c=>c.id===cid),k,amount:a.amount}));
@@ -437,12 +473,12 @@ function showTab(t){
   $('#tab-c').setAttribute('aria-selected',t==='c');$('#tab-k').setAttribute('aria-selected',t==='k');
   $('#panel-c').hidden=t!=='c';$('#panel-k').hidden=t!=='k';
 }
-$('#tab-c').onclick=()=>{showTab('c');if(state.mode!=='container'&&!running)selectContainer(lastC)};
+$('#tab-c').onclick=()=>{showTab('c');if(state.mode==='client'&&!running)selectContainer(lastC)};
 $('#tab-k').onclick=()=>showTab('k');
 let lastC='C1';
 
 function renderList(){
-  $('#clist').innerHTML=containers.map(c=>`<button class="ccard" type="button" data-id="${c.id}" aria-pressed="${state.mode==='container'&&state.id===c.id}">
+  $('#clist').innerHTML=containers.map(c=>`<button class="ccard" type="button" data-id="${c.id}" aria-pressed="${(state.mode==='container'&&state.id===c.id)||(state.mode==='pair'&&state.cid===c.id)}">
     <span class="sw" style="background:${c.color}"></span>
     <span class="code">${c.code}</span>
     <span class="meta">${c.type} · ${c.origin} · ${c.arrival}</span>
@@ -457,7 +493,7 @@ function renderDetail(c){
   const prod=c.products.map((p,i)=>`<tr><td>${goodsHTML(kinds[p.name])}${p.name}</td><td class="r">${nf.format(p.qty)} ${p.unit}</td><td class="r">${nf.format(c.sold[i])}</td><td class="r">${nf.format(p.qty-c.sold[i])}</td><td class="r">${nf.format(p.price)}</td><td class="r">${nf.format(c.sold[i]*p.price)}</td></tr>`).join('');
   const rows=Object.entries(byC[c.id]).sort((a,b)=>(b[1].amount-b[1].paid)-(a[1].amount-a[1].paid)).map(([kid,a])=>{
     const k=clients.find(x=>x.id===kid),[cls,lab]=status(a.amount,a.paid);
-    return `<tr><td><div class="who">${avatarHTML(k.look)}<div><b>${k.name}</b><br><span class="muted" style="font-size:.8rem">${k.place}</span></div></div></td>
+    return `<tr class="click" data-k="${kid}" tabindex="0" title="Voir ce que ${k.name} a pris dans ce conteneur"><td><div class="who">${avatarHTML(k.look)}<div><b>${k.name}</b><br><span class="muted" style="font-size:.8rem">${k.place}</span></div></div></td>
     <td>${a.lines.map(l=>`${goodsHTML(kinds[l.p.name])}${nf.format(l.q)} ${l.p.unit} <span class="muted">${l.p.name.split(' ')[0].toLowerCase()}</span>`).join('<br>')}</td>
     <td class="r">${nf.format(a.amount)}</td><td class="r">${nf.format(a.paid)}<div class="minibar"><span style="width:${a.paid/a.amount*100}%"></span></div></td>
     <td class="r" style="${a.amount-a.paid>1?'color:var(--bad);font-weight:600':''}">${nf.format(a.amount-a.paid)}</td>
@@ -476,23 +512,79 @@ function renderDetail(c){
     <div><h3 style="margin-bottom:6px">Contenu</h3><div class="tbl-wrap"><table>
       <thead><tr><th>Produit</th><th class="r">Reçu</th><th class="r">Vendu</th><th class="r">En stock</th><th class="r">Prix unit. (GNF)</th><th class="r">Ventes (GNF)</th></tr></thead><tbody>${prod}</tbody></table></div></div>
     <div><h3 style="margin-bottom:6px">Distribution et paiements</h3><div class="tbl-wrap"><table>
-      <thead><tr><th>Client</th><th>Reçu</th><th class="r">Montant (GNF)</th><th class="r">Payé</th><th class="r">Reste</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      <thead><tr><th>Client</th><th>Reçu</th><th class="r">Montant (GNF)</th><th class="r">Payé</th><th class="r">Reste</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table></div><p class="muted" style="font-size:.82rem;margin:8px 0 0">Cliquez sur un client pour voir le détail de ce qu'il a pris.</p></div>`;
+  $('#detail').querySelectorAll('tr.click').forEach(tr=>{
+    const go=()=>{if(!running)selectPair(c.id,tr.dataset.k,'c')};tr.onclick=go;
+    tr.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();go()}}});
 }
 function renderClients(){
   const rows=[...clients].sort((a,b)=>(b.total-b.paid)-(a.total-a.paid)).map(k=>{
     const [cls,lab]=status(k.total,k.paid);
     const chips=Object.keys(byK[k.id]).map(cid=>{const c=containers.find(x=>x.id===cid),a=byK[k.id][cid],[s]=status(a.amount,a.paid);
-      return `<span class="cc" title="${status(a.amount,a.paid)[1]}"><i style="background:${c.color}"></i>${c.code.slice(5,11)}${s!=='ok'?` <span style="color:var(--${s})">●</span>`:''}</span>`}).join('');
-    return `<tr class="click ${state.mode==='client'&&state.id===k.id?'on':''}" data-id="${k.id}" tabindex="0"><td><div class="who">${avatarHTML(k.look)}<div><b>${k.name}</b><br><span class="muted" style="font-size:.8rem">${k.place}</span></div></div></td>
+      return `<button type="button" class="cc go" data-c="${cid}" title="${status(a.amount,a.paid)[1]} — voir ce que ${k.name} a pris dans ${c.code}"><i style="background:${c.color}"></i>${c.code.slice(5,11)}${s!=='ok'?` <span style="color:var(--${s})">●</span>`:''}</button>`}).join('');
+    return `<tr class="click ${(state.mode==='client'&&state.id===k.id)||(state.mode==='pair'&&state.kid===k.id)?'on':''}" data-id="${k.id}" tabindex="0"><td><div class="who">${avatarHTML(k.look)}<div><b>${k.name}</b><br><span class="muted" style="font-size:.8rem">${k.place}</span></div></div></td>
       <td>${chips}</td><td class="r">${nf.format(k.total)}</td><td class="r">${nf.format(k.paid)}</td>
       <td class="r" style="${k.total-k.paid>1?'color:var(--bad);font-weight:600':''}">${nf.format(k.total-k.paid)}</td><td><span class="chip ${cls}">${lab}</span></td></tr>`}).join('');
   $('#ktable').innerHTML=`<thead><tr><th>Client</th><th>Conteneurs reçus</th><th class="r">Acheté (GNF)</th><th class="r">Payé</th><th class="r">Doit encore</th><th>Statut</th></tr></thead><tbody>${rows}</tbody>`;
   document.querySelectorAll('#ktable tr.click').forEach(tr=>{
     const go=()=>{if(!running)selectClient(tr.dataset.id)};tr.onclick=go;
     tr.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();go()}}});
+  document.querySelectorAll('#ktable .cc.go').forEach(b=>b.onclick=e=>{e.stopPropagation();if(!running){selectPair(b.dataset.c,b.closest('tr').dataset.id,'k');showTab('c')}});
 }
-function selectContainer(id){state={mode:'container',id};lastC=id;renderList();renderDetail(containers.find(c=>c.id===id));renderClients();paintScene()}
-function selectClient(id){state={mode:'client',id};renderList();renderClients();paintScene()}
+
+// ---- un client dans un conteneur : produits pris, en icônes
+const takes=a=>{const m={};a.lines.forEach(l=>{const t=m[l.p.name]||(m[l.p.name]={p:l.p,q:0,amt:0,paid:0});t.q+=l.q;t.amt+=l.amt;t.paid+=l.paid});return Object.values(m)};
+const truckSVG=col=>`<svg class="trk" viewBox="-12 -10 24 16" aria-hidden="true">${truck(col)}</svg>`;
+function renderPair(c,k){
+  const a=byC[c.id][k.id],[cls,lab]=status(a.amount,a.paid),list=takes(a);
+  const items=list.map(t=>{
+    const per=Math.max(1,Math.round(t.p.qty/10)),on=Math.max(1,Math.round(t.q/per)),[tc,tl]=status(t.amt,t.paid);
+    const pic=off=>`<svg viewBox="0 0 24 24" aria-hidden="true"${off?' class="off"':''}>${goods(kinds[t.p.name])}</svg>`;
+    return `<div class="take" style="--cc:${c.color}">
+      <svg class="big" viewBox="0 0 24 24" aria-hidden="true">${goods(kinds[t.p.name])}</svg>
+      <div><b>${nf.format(t.q)} ${t.p.unit}</b> · ${t.p.name}
+        <div class="picto" role="img" aria-label="${Math.round(t.q/t.p.qty*100)} % de ce que le conteneur contenait">${Array.from({length:10},(_,i)=>pic(i>=on)).join('')}</div>
+        <span class="picto-note">${Math.round(t.q/t.p.qty*100)} % des ${nf.format(t.p.qty)} ${t.p.unit} reçus · 1 icône ≈ ${nf.format(per)} ${t.p.unit}</span></div>
+      <div class="money"><span>${nf.format(t.q)} × ${nf.format(t.p.price)} = <b>${nf.format(t.amt)} GNF</b></span>
+        <span class="muted" style="font-size:.82rem">payé ${nf.format(t.paid)} · reste ${nf.format(t.amt-t.paid)}</span>
+        <span class="chip ${tc}">${tl}</span></div></div>`}).join('');
+  const others=Object.keys(byK[k.id]).filter(cid=>cid!==c.id).map(cid=>{const o=containers.find(x=>x.id===cid);
+    return `<button type="button" class="cc go" data-c="${cid}"><i style="background:${o.color}"></i>${o.code}</button>`}).join('');
+  $('#detail').innerHTML=`
+    <div class="dhead"><div class="route">
+        <span class="box" style="background:${c.color}">${c.code.slice(0,4)}<br>${c.code.slice(5,11)}</span>${truckSVG(c.color)}${avatarHTML(k.look)}
+        <div><span class="eyebrow">Du conteneur ${c.code} à</span><div style="font-weight:600">${k.name} <span class="muted" style="font-weight:400">· ${k.place}</span></div></div>
+      </div><span class="chip ${cls}">${lab}</span></div>
+    <div class="kpis">
+      <div class="kpi"><span class="eyebrow">Montant</span><strong>${short(a.amount)}</strong><small>${gnf(a.amount)}</small></div>
+      <div class="kpi"><span class="eyebrow">Payé</span><strong>${short(a.paid)}</strong><small>${Math.round(a.paid/a.amount*100)} % du montant</small></div>
+      <div class="kpi ${a.amount-a.paid>1?'loss':'good'}"><span class="eyebrow">Reste à payer</span><strong>${short(a.amount-a.paid)}</strong><small>${gnf(a.amount-a.paid)}</small></div>
+      <div class="kpi"><span class="eyebrow">Part des ventes du conteneur</span><strong>${Math.round(a.amount/c.sales*100)} %</strong><small>sur ${short(c.sales)} vendus</small></div>
+    </div>
+    <div><h3 style="margin-bottom:10px">Produits pris dans ce conteneur</h3><div class="takes">${items}</div></div>
+    <div><h3 style="margin-bottom:8px">${k.name} a aussi reçu de</h3>${others||'<span class="muted">Aucun autre conteneur.</span>'}</div>`;
+  $('#detail').querySelectorAll('.cc.go').forEach(b=>b.onclick=()=>{if(!running)selectPair(b.dataset.c,k.id,state.from)});
+}
+
+// ---- fil d'Ariane
+function renderCrumbs(){
+  const C=id=>containers.find(x=>x.id===id),K=id=>clients.find(x=>x.id===id);
+  const cc=c=>({html:`<i class="sw" style="background:${c.color}"></i><span class="mono">${c.code}</span>`,go:()=>{selectContainer(c.id);showTab('c')}});
+  const kk=k=>({html:`${avatarHTML(k.look)}${k.name}`,go:()=>{selectClient(k.id);showTab('k')}});
+  const rootC={html:'Conteneurs',go:()=>{selectContainer(state.cid||state.id);showTab('c')}},rootK={html:'Clients',go:()=>{selectClient(state.kid||state.id);showTab('k')}};
+  let path;
+  if(state.mode==='container')path=[rootC,cc(C(state.id))];
+  else if(state.mode==='client')path=[rootK,kk(K(state.id))];
+  else{const c=C(state.cid),k=K(state.kid);
+    path=state.from==='k'?[rootK,kk(k),cc(c)]:[rootC,cc(c),kk(k)];
+    path.push({html:takes(byC[c.id][k.id]).map(t=>`<svg class="pic" viewBox="0 0 24 24" aria-hidden="true">${goods(kinds[t.p.name])}</svg>`).join('')+'Produits pris'});}
+  $('#crumbs').innerHTML=`<ol><li><span class="lead">Vous êtes ici</span></li>${path.map((x,i)=>`<li>${i<path.length-1?`<button type="button" data-i="${i}">${x.html}</button>`:`<span aria-current="page">${x.html}</span>`}</li>`).join('')}</ol>`;
+  $('#crumbs').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(!running)path[b.dataset.i].go()});
+}
+
+function selectContainer(id){state={mode:'container',id};lastC=id;renderList();renderDetail(containers.find(c=>c.id===id));renderClients();renderCrumbs();paintScene()}
+function selectClient(id){state={mode:'client',id};renderList();renderClients();renderCrumbs();paintScene()}
+function selectPair(cid,kid,from){state={mode:'pair',cid,kid,from};lastC=cid;renderList();renderPair(containers.find(c=>c.id===cid),clients.find(k=>k.id===kid));renderClients();renderCrumbs();paintScene()}
 
 // ---- bande « comment lire »
 (()=>{
@@ -515,7 +607,7 @@ function selectClient(id){state={mode:'client',id};renderList();renderClients();
   $('#steps').innerHTML=txt.map((t,i)=>`<div class="step"><svg viewBox="0 0 72 54" aria-hidden="true">${pics[i]}</svg><div><b><em>${i+1}</em>${t[0]}</b><span>${t[1]}</span></div></div>`).join('');
 })();
 
-renderList();renderDetail(containers[0]);renderClients();
+renderList();renderDetail(containers[0]);renderClients();renderCrumbs();
 intro();
 </script>
 </html>
