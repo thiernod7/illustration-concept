@@ -54,6 +54,22 @@ C'est la **référence visuelle et fonctionnelle**. C'est une page HTML autonome
   - thème clair et sombre ;
   - respect de `prefers-reduced-motion`.
 
+## Reprise des habitudes d'Invoice Manager
+Le client utilisait **Invoice Manager** (application mobile de facturation). La nouvelle application doit garder ses repères, en les rattachant aux conteneurs :
+
+| Invoice Manager | Dans notre application |
+|---|---|
+| Facture (n°, date, client, articles, total, solde) | **Facture** `FAC-2026-008` : chaque ligne porte son **conteneur d'origine** ; une facture peut mélanger plusieurs conteneurs |
+| Paiement (date, montant, remarque, « plein payé maintenant », reçu) | **Paiement** daté, avec mode (Espèces, Orange Money, MTN MoMo, virement) ; plusieurs paiements par facture ; solde de facture |
+| Client / Fournisseur, solde d'ouverture (Recevoir / Donner), limite de crédit | **Client** avec limite de crédit (alerte si dépassée) ; **Fournisseur** du conteneur, avec ce qui lui a été versé sur l'achat |
+| Produit, inventaire, état des stocks | Produits **du conteneur** : reçu / vendu / en stock |
+| Dépenses | Coûts du conteneur : fret, dédouanement, manutention |
+| Rapports : factures impayées par client, facture vieillissante, ventes par client / par produit (top 5), profit et perte | Onglet **Rapports** : impayés par ancienneté (0–30, 31–60, 61–90, +90 j), top 5 clients, top 5 produits ; résultat par conteneur |
+| Aperçu PDF, signature client, notes / CGV, notes privées | Aperçu de facture avec signature et CGV (modèles PDF, logo : plus tard) |
+| Estimation, bon de commande, note de livraison, note de crédit, retours | Hors maquette ; à prévoir : retours et avoirs sur un conteneur |
+
+Ajouts au modèle de données : **Facture** (n°, client, date, lignes = ventes), **Paiement** (facture, date, montant, mode), **Fournisseur** (nom, montant versé), **Client.limite de crédit**.
+
 ## Langue
 Toute l'interface et les textes sont en **français**.
 
