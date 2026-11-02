@@ -205,7 +205,7 @@ footer{font-size:.8rem;color:var(--muted);max-width:75ch}
 
   <section class="totals" aria-label="Totaux">
     <div><span class="eyebrow">Investi (4 conteneurs)</span><strong id="t-cost"></strong></div>
-    <div><span class="eyebrow">Ventes</span><strong id="t-sales"></strong></div>
+    <div><span class="eyebrow">Ventes (après avoirs)</span><strong id="t-sales"></strong></div>
     <div><span class="eyebrow">Encaissé</span><strong id="t-paid"></strong></div>
     <div><span class="eyebrow">Reste à percevoir</span><strong id="t-due" style="color:var(--bad)"></strong></div>
     <div><span class="eyebrow">Résultat à ce jour</span><strong id="t-res"></strong></div>
@@ -269,13 +269,15 @@ footer{font-size:.8rem;color:var(--muted);max-width:75ch}
     </div>
     <div id="panel-f" role="tabpanel" aria-labelledby="tab-f" class="fview" hidden>
       <div class="pvt"><div class="dhead"><h3>Factures</h3><span class="muted" style="font-size:.85rem">Une facture peut contenir des produits de plusieurs conteneurs. Situation au <span id="today"></span>.</span></div>
-        <div class="tbl-wrap"><table id="ftable"></table></div></div>
+        <div class="tbl-wrap"><table id="ftable"></table></div>
+        <div class="dhead" style="margin-top:14px"><h3>Retours et avoirs</h3><span class="muted" style="font-size:.85rem">Un avoir est déduit de la facture, ou gardé en crédit si elle est déjà payée.</span></div>
+        <div class="tbl-wrap"><table id="atable"></table></div></div>
       <div id="invoice"></div>
     </div>
     <div id="panel-r" role="tabpanel" aria-labelledby="tab-r" class="rgrid" hidden></div>
   </section>
 
-  <footer>Résultat = ventes − coût de revient du conteneur (achat + fret + dédouanement + manutention). Tant qu'un conteneur n'est pas entièrement vendu, son résultat est provisoire ; le résultat prévu suppose que le stock restant part au prix indiqué. Montants en francs guinéens (GNF).</footer>
+  <footer>Résultat = ventes − coût de revient du conteneur (achat + fret + dédouanement + manutention). Tant qu'un conteneur n'est pas entièrement vendu, son résultat est provisoire ; le résultat prévu suppose que le stock restant part au prix indiqué. Les ventes sont comptées après déduction des avoirs (retours et remises). Montants en francs guinéens (GNF).</footer>
 </div>
 
 <script>
@@ -367,6 +369,13 @@ const invoiceData=[
  ['FAC-2026-015','k2','2026-10-22',[19],[['2026-10-22',15.12e6,'Orange Money']]],
  ['FAC-2026-016','k4','2026-10-24',[21],[]],
 ];
+// retours et avoirs : [n°, facture, vente (rang), quantité, type, date, motif]
+// type : stock = repris et remis en stock · rebut = repris mais invendable · remise = avoir sans retour, le client garde la marchandise
+const creditData=[
+ ['AV-2026-001','FAC-2026-005',5,20,'stock','2026-08-04','Erreur de commande : bidons rendus intacts'],
+ ['AV-2026-002','FAC-2026-011',16,10,'rebut','2026-09-30','Batteries défectueuses, reprises et mises au rebut'],
+ ['AV-2026-003','FAC-2026-013',17,6,'remise','2026-10-22','Sacs mouillés pendant le transport : le client les garde'],
+];
 const TODAY='2026-11-02';
 
 const $=s=>document.querySelector(s);
@@ -383,20 +392,24 @@ const costColors={achat:'var(--ink)',fret:'var(--sea-2)',douane:'var(--c3)',manu
 const byC={},byK={};
 containers.forEach(c=>{
   c.cost=Object.values(c.costs).reduce((a,b)=>a+b,0);
-  c.sold=c.products.map(()=>0);c.sales=0;c.paid=0;byC[c.id]={};
+  c.sold=c.products.map(()=>0);c.soldAmt=c.products.map(()=>0);c.back=c.products.map(()=>0);c.scrap=c.products.map(()=>0);
+  c.sales=0;c.paid=0;c.credit=0;byC[c.id]={};
 });
 clients.forEach(k=>{byK[k.id]={};k.total=0;k.paid=0});
-sales.forEach(([cid,kid,pi,q,f])=>{
-  const c=containers.find(x=>x.id===cid),amt=q*c.products[pi].price,paid=amt*f;
-  c.sold[pi]+=q;c.sales+=amt;c.paid+=paid;
-  const a=byC[cid][kid]||(byC[cid][kid]={amount:0,paid:0,lines:[]});
-  a.amount+=amt;a.paid+=paid;a.lines.push({p:c.products[pi],q,amt,paid});
+sales.forEach(([cid,kid,pi,q,f],i)=>{
+  const c=containers.find(x=>x.id===cid),price=c.products[pi].price,paid=q*price*f;
+  const cr=creditData.filter(x=>x[2]===i),qOf=t=>cr.filter(x=>t.includes(x[4])).reduce((s,x)=>s+x[3],0);
+  const back=qOf(['stock','rebut']),off=qOf(['stock','rebut','remise'])*price,amt=q*price-off;
+  c.sold[pi]+=q-back;c.soldAmt[pi]+=amt;c.back[pi]+=back;c.scrap[pi]+=qOf(['rebut']);
+  c.sales+=amt;c.paid+=paid;c.credit+=off;
+  const a=byC[cid][kid]||(byC[cid][kid]={amount:0,paid:0,lines:[],credits:[]});
+  a.amount+=amt;a.paid+=paid;a.lines.push({p:c.products[pi],q:q-back,amt,paid,ret:back,off});
   byK[kid][cid]=a;
   const k=clients.find(x=>x.id===kid);k.total+=amt;k.paid+=paid;
 });
 containers.forEach(c=>{
   c.result=c.sales-c.cost;c.due=c.sales-c.paid;
-  c.stockValue=c.products.reduce((s,p,i)=>s+(p.qty-c.sold[i])*p.price,0);
+  c.stockValue=c.products.reduce((s,p,i)=>s+(p.qty-c.sold[i]-c.scrap[i])*p.price,0);
   c.projected=c.result+c.stockValue;
 });
 const status=(amt,paid)=>paid>=amt-1?['ok','Soldé']:paid>0?['warn','Partiel']:['bad','Impayé'];
@@ -407,11 +420,24 @@ const invoices=invoiceData.map(([no,kid,date,ix,pays])=>{
   const lines=ix.map(i=>{const [cid,,pi,q]=sales[i],c=containers.find(x=>x.id===cid),p=c.products[pi];return {c,p,q,amt:q*p.price}});
   const v={no,date,k:clients.find(x=>x.id===kid),lines,pays:pays.map(([date,amt,mode])=>({date,amt,mode})),
     cids:[...new Set(lines.map(l=>l.c.id))],age:ageOf(date)};
-  v.total=lines.reduce((s,l)=>s+l.amt,0);v.paid=v.pays.reduce((s,x)=>s+x.amt,0);v.due=v.total-v.paid;
+  v.total=lines.reduce((s,l)=>s+l.amt,0);v.paid=v.pays.reduce((s,x)=>s+x.amt,0);v.credits=[];v.imputed=0;
   v.cids.forEach(cid=>{const a=byC[cid][kid];(a.inv=a.inv||[]).push(v)});
   return v;
 });
 const invByNo=no=>invoices.find(v=>v.no===no);
+// un avoir réduit la facture si elle n'est pas encore payée ; sinon il devient un crédit pour le client
+const typeLabel={stock:['ok','Repris · remis en stock'],rebut:['bad','Repris · mis au rebut'],remise:['warn','Avoir sans retour']};
+const credits=creditData.map(([no,fno,i,q,type,date,motif])=>{
+  const [cid,kid,pi]=sales[i],c=containers.find(x=>x.id===cid),p=c.products[pi],v=invByNo(fno),amt=q*p.price;
+  const onInvoice=v.total-v.imputed-v.paid>=amt-1;
+  const x={no,v,c,p,k:v.k,q,type,date,motif,amt,onInvoice};
+  if(onInvoice)v.imputed+=amt;v.credits.push(x);byC[cid][kid].credits.push(x);
+  return x;
+});
+invoices.forEach(v=>{v.net=v.total-v.imputed;v.due=v.net-v.paid});
+const hasRet=a=>a.credits.some(x=>x.type!=='remise');
+const retIcon='<svg class="pic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8H4V3M4.8 8A8.5 8.5 0 1 1 3.6 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const dueTxt=x=>x<-1?`<span style="color:var(--ok);font-weight:600">crédit ${nf.format(-x)}</span>`:nf.format(x);
 
 // ---- totaux
 (()=>{const T=k=>containers.reduce((s,c)=>s+c[k],0);
@@ -474,11 +500,12 @@ function drawFlows(links){
     const len=p.getTotalLength();
     if(!reduce)p.animate([{strokeDasharray:`0 ${len}`},{strokeDasharray:`${len} ${len}`}],{duration:900,easing:'ease-out'});
     const dots=[0,1].map(j=>{const d=document.createElementNS(NS,'g');d.innerHTML=truck(l.c.color);$('#dots').appendChild(d);return {d,off:j/2+Math.random()*.15}});
+    if(l.back){const d=document.createElementNS(NS,'g');d.innerHTML=truck('var(--muted)');$('#dots').appendChild(d);dots.push({d,off:.25,rev:true})}
     flows.push({p,len,dots,speed:.00011+.00005*Math.random()});
   });
   placeDots(performance.now());
 }
-function placeDots(t){flows.forEach(f=>f.dots.forEach(o=>{const u=reduce?(o.off+.3)%1:((t*f.speed+o.off)%1);const pt=f.p.getPointAtLength(u*f.len);o.d.setAttribute('transform',`translate(${pt.x.toFixed(1)},${pt.y.toFixed(1)})`)}))}
+function placeDots(t){flows.forEach(f=>f.dots.forEach(o=>{const u=reduce?(o.off+.3)%1:((t*f.speed+o.off)%1);const pt=f.p.getPointAtLength((o.rev?1-u:u)*f.len);o.d.setAttribute('transform',`translate(${pt.x.toFixed(1)},${pt.y.toFixed(1)})${o.rev?' scale(-1,1)':''}`)}))}
 (function loop(t){if(!reduce)placeDots(t);requestAnimationFrame(loop)})(0);
 
 function paintScene(){
@@ -518,6 +545,8 @@ function paintScene(){
     drawCargo('Reçu par '+k.name.split(' ').slice(-2).join(' '),Object.values(got).map(g=>({kind:kinds[g.p.name],label:`${nf.format(g.q)} ${g.p.unit} · ${g.p.name}`})));
     $('#hint').innerHTML=`<b>${k.name}</b> a reçu des produits de ${links.length} conteneur${links.length>1?'s':''}`;
   }
+  links.forEach(l=>{l.back=hasRet(byC[l.c.id][l.k.id])});
+  if(links.some(l=>l.back))$('#hint').innerHTML+=' <span class="muted">· camion gris en sens inverse : retour de marchandise</span>';
   drawFlows(links);
 }
 
@@ -570,20 +599,25 @@ function renderDetail(c){
   const resCls=c.result>=0?'good':'loss';
   const parts=Object.entries(c.costs).map(([k,v])=>`<span style="width:${(v/c.cost*100).toFixed(2)}%;background:${costColors[k]}" title="${costLabels[k]}"></span>`).join('');
   const leg=Object.entries(c.costs).map(([k,v])=>`<span><i style="background:${costColors[k]}"></i>${costLabels[k]} · <span class="num">${short(v)}</span></span>`).join('');
-  const prod=c.products.map((p,i)=>`<tr><td>${goodsHTML(kinds[p.name])}${p.name}</td><td class="r">${nf.format(p.qty)} ${p.unit}</td><td class="r">${nf.format(c.sold[i])}</td><td class="r">${nf.format(p.qty-c.sold[i])}</td><td class="r">${nf.format(p.price)}</td><td class="r">${nf.format(c.sold[i]*p.price)}</td></tr>`).join('');
+  const prod=c.products.map((p,i)=>`<tr><td>${goodsHTML(kinds[p.name])}${p.name}</td><td class="r">${nf.format(p.qty)} ${p.unit}</td><td class="r">${nf.format(c.sold[i])}</td><td class="r">${c.back[i]?`${retIcon}${nf.format(c.back[i])}${c.scrap[i]?`<div class="age late">dont ${nf.format(c.scrap[i])} au rebut</div>`:''}`:'<span class="muted">—</span>'}</td><td class="r">${nf.format(p.qty-c.sold[i]-c.scrap[i])}</td><td class="r">${nf.format(p.price)}</td><td class="r">${nf.format(c.soldAmt[i])}</td></tr>`).join('');
+  const crs=credits.filter(x=>x.c===c);
+  const crRows=crs.map(x=>{const [tc,tl]=typeLabel[x.type];return `<tr class="click" data-no="${x.v.no}" tabindex="0"><td class="mono" style="white-space:nowrap">${x.no}<div class="age">${fdate(x.date)}</div></td>
+    <td><div class="who">${avatarHTML(x.k.look)}<b style="font-weight:500">${x.k.name}</b></div></td>
+    <td>${goodsHTML(kinds[x.p.name])}${nf.format(x.q)} ${x.p.unit}<div class="age">${x.motif}</div></td><td><span class="chip ${tc}">${tl}</span></td>
+    <td class="r">− ${nf.format(x.amt)}<div class="age">${x.onInvoice?'déduit de '+x.v.no:'crédit client'}</div></td></tr>`}).join('');
   const rows=Object.entries(byC[c.id]).sort((a,b)=>(b[1].amount-b[1].paid)-(a[1].amount-a[1].paid)).map(([kid,a])=>{
     const k=clients.find(x=>x.id===kid),[cls,lab]=status(a.amount,a.paid);
     return `<tr class="click" data-k="${kid}" tabindex="0" title="Voir ce que ${k.name} a pris dans ce conteneur"><td><div class="who">${avatarHTML(k.look)}<div><b>${k.name}</b><br><span class="muted" style="font-size:.8rem">${k.place}</span></div></div></td>
     <td>${a.lines.map(l=>`${goodsHTML(kinds[l.p.name])}${nf.format(l.q)} ${l.p.unit} <span class="muted">${l.p.name.split(' ')[0].toLowerCase()}</span>`).join('<br>')}</td>
     <td class="r">${nf.format(a.amount)}</td><td class="r">${nf.format(a.paid)}<div class="minibar"><span style="width:${a.paid/a.amount*100}%"></span></div></td>
-    <td class="r" style="${a.amount-a.paid>1?'color:var(--bad);font-weight:600':''}">${nf.format(a.amount-a.paid)}</td>
+    <td class="r" style="${a.amount-a.paid>1?'color:var(--bad);font-weight:600':''}">${dueTxt(a.amount-a.paid)}${a.credits.length?`<div class="age">${retIcon}${a.credits.map(x=>x.no).join(', ')}</div>`:''}</td>
     <td><span class="chip ${cls}">${lab}</span></td></tr>`}).join('');
   $('#detail').innerHTML=`
     <div class="dhead"><div><span class="eyebrow">${c.type} · ${c.origin} · arrivé le ${c.arrival}</span><div class="code">${c.code}</div></div>
       <span class="chip ${c.status==='Vendu'?'ok':'warn'}">${c.status}</span></div>
     <div class="kpis">
       <div class="kpi"><span class="eyebrow">Coût de revient</span><strong>${short(c.cost)}</strong><small>${gnf(c.cost)}</small></div>
-      <div class="kpi"><span class="eyebrow">Ventes</span><strong>${short(c.sales)}</strong><small>${gnf(c.sales)}</small></div>
+      <div class="kpi"><span class="eyebrow">Ventes</span><strong>${short(c.sales)}</strong><small>${c.credit?`après ${short(c.credit)} d'avoirs`:gnf(c.sales)}</small></div>
       <div class="kpi"><span class="eyebrow">Encaissé</span><strong>${short(c.paid)}</strong><small>${Math.round(c.paid/c.sales*100)} % des ventes</small></div>
       <div class="kpi ${c.due>1?'loss':''}"><span class="eyebrow">Reste à percevoir</span><strong>${short(c.due)}</strong><small>${Object.values(byC[c.id]).filter(a=>a.paid<a.amount-1).length} client(s) en retard</small></div>
       <div class="kpi ${resCls}"><span class="eyebrow">${c.result>=0?'Bénéfice':'Perte'}${c.status!=='Vendu'?' à ce jour':''}</span><strong>${signed(c.result)}</strong><small>${c.stockValue>0?`Prévu si tout est vendu : ${signed(c.projected)}`:`${(c.result/c.cost*100).toFixed(1).replace('.',',')} % du coût`}</small></div>
@@ -591,10 +625,14 @@ function renderDetail(c){
     <div><h3 style="margin-bottom:8px">Ce que le conteneur a coûté</h3><div class="costbar">${parts}</div><div class="legend">${leg}</div>
       <div class="supplier"><span class="eyebrow">Fournisseur</span><b>${c.supplier.name}</b><span class="muted">payé ${short(c.supplier.paid)} sur ${short(c.costs.achat)} d'achat</span>${c.supplier.paid>=c.costs.achat?'<span class="chip ok">Réglé</span>':`<span class="chip warn">Reste ${short(c.costs.achat-c.supplier.paid)} à verser</span>`}</div></div>
     <div><h3 style="margin-bottom:6px">Contenu</h3><div class="tbl-wrap"><table>
-      <thead><tr><th>Produit</th><th class="r">Reçu</th><th class="r">Vendu</th><th class="r">En stock</th><th class="r">Prix unit. (GNF)</th><th class="r">Ventes (GNF)</th></tr></thead><tbody>${prod}</tbody></table></div></div>
+      <thead><tr><th>Produit</th><th class="r">Reçu</th><th class="r">Vendu</th><th class="r">Retours</th><th class="r">En stock</th><th class="r">Prix unit. (GNF)</th><th class="r">Ventes (GNF)</th></tr></thead><tbody>${prod}</tbody></table></div></div>
     <div><h3 style="margin-bottom:6px">Distribution et paiements</h3><div class="tbl-wrap"><table>
-      <thead><tr><th>Client</th><th>Reçu</th><th class="r">Montant (GNF)</th><th class="r">Payé</th><th class="r">Reste</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table></div><p class="muted" style="font-size:.82rem;margin:8px 0 0">Cliquez sur un client pour voir le détail de ce qu'il a pris.</p></div>`;
-  $('#detail').querySelectorAll('tr.click').forEach(tr=>{
+      <thead><tr><th>Client</th><th>Reçu</th><th class="r">Montant (GNF)</th><th class="r">Payé</th><th class="r">Reste</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table></div><p class="muted" style="font-size:.82rem;margin:8px 0 0">Cliquez sur un client pour voir le détail de ce qu'il a pris.</p></div>${crs.length?`
+    <div><h3 style="margin-bottom:6px">${retIcon}Retours et avoirs</h3><div class="tbl-wrap"><table class="crt">
+      <thead><tr><th>Avoir</th><th>Client</th><th>Produit · motif</th><th>Type</th><th class="r">Montant (GNF)</th></tr></thead><tbody>${crRows}</tbody></table></div></div>`:''}`;
+  $('#detail').querySelectorAll('table.crt tr.click').forEach(tr=>{tr.onclick=()=>{if(!running){selectInvoice(tr.dataset.no);showTab('f')}};
+    tr.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();tr.onclick()}}});
+  $('#detail').querySelectorAll('tr.click[data-k]').forEach(tr=>{
     const go=()=>{if(!running)selectPair(c.id,tr.dataset.k,'c')};tr.onclick=go;
     tr.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();go()}}});
 }
@@ -605,7 +643,7 @@ function renderClients(){
       return `<button type="button" class="cc go" data-c="${cid}" title="${status(a.amount,a.paid)[1]} — voir ce que ${k.name} a pris dans ${c.code}"><i style="background:${c.color}"></i>${c.code.slice(5,11)}${s!=='ok'?` <span style="color:var(--${s})">●</span>`:''}</button>`}).join('');
     return `<tr class="click ${(state.mode==='client'&&state.id===k.id)||(state.mode==='pair'&&state.kid===k.id)?'on':''}" data-id="${k.id}" tabindex="0"><td><div class="who">${avatarHTML(k.look)}<div><b>${k.name}</b><br><span class="muted" style="font-size:.8rem">${k.place}</span></div></div></td>
       <td>${chips}</td><td class="r">${nf.format(k.total)}</td><td class="r">${nf.format(k.paid)}</td>
-      <td class="r" style="${k.total-k.paid>1?'color:var(--bad);font-weight:600':''}">${nf.format(k.total-k.paid)}<div class="lim ${k.total-k.paid>k.limit?'over':''}">${k.total-k.paid>k.limit?'dépasse sa ':''}limite ${short(k.limit)}</div></td><td><span class="chip ${cls}">${lab}</span></td></tr>`}).join('');
+      <td class="r" style="${k.total-k.paid>1?'color:var(--bad);font-weight:600':''}">${dueTxt(k.total-k.paid)}<div class="lim ${k.total-k.paid>k.limit?'over':''}">${k.total-k.paid>k.limit?'dépasse sa ':''}limite ${short(k.limit)}</div></td><td><span class="chip ${cls}">${lab}</span></td></tr>`}).join('');
   $('#ktable').innerHTML=`<thead><tr><th>Client</th><th>Conteneurs reçus</th><th class="r">Acheté (GNF)</th><th class="r">Payé</th><th class="r">Doit encore</th><th>Statut</th></tr></thead><tbody>${rows}</tbody>`;
   document.querySelectorAll('#ktable tr.click').forEach(tr=>{
     const go=()=>{if(!running)selectClient(tr.dataset.id)};tr.onclick=go;
@@ -614,7 +652,7 @@ function renderClients(){
 }
 
 // ---- un client dans un conteneur : produits pris, en icônes
-const takes=a=>{const m={};a.lines.forEach(l=>{const t=m[l.p.name]||(m[l.p.name]={p:l.p,q:0,amt:0,paid:0});t.q+=l.q;t.amt+=l.amt;t.paid+=l.paid});return Object.values(m)};
+const takes=a=>{const m={};a.lines.forEach(l=>{const t=m[l.p.name]||(m[l.p.name]={p:l.p,q:0,amt:0,paid:0,ret:0,off:0});t.q+=l.q;t.amt+=l.amt;t.paid+=l.paid;t.ret+=l.ret;t.off+=l.off});return Object.values(m)};
 const truckSVG=col=>`<svg class="trk" viewBox="-12 -10 24 16" aria-hidden="true">${truck(col)}</svg>`;
 function renderPair(c,k){
   const a=byC[c.id][k.id],[cls,lab]=status(a.amount,a.paid),list=takes(a);
@@ -625,9 +663,11 @@ function renderPair(c,k){
       <svg class="big" viewBox="0 0 24 24" aria-hidden="true">${goods(kinds[t.p.name])}</svg>
       <div><b>${nf.format(t.q)} ${t.p.unit}</b> · ${t.p.name}
         <div class="picto" role="img" aria-label="${Math.round(t.q/t.p.qty*100)} % de ce que le conteneur contenait">${Array.from({length:10},(_,i)=>pic(i>=on)).join('')}</div>
-        <span class="picto-note">${Math.round(t.q/t.p.qty*100)} % des ${nf.format(t.p.qty)} ${t.p.unit} reçus · 1 icône ≈ ${nf.format(per)} ${t.p.unit}</span></div>
-      <div class="money"><span>${nf.format(t.q)} × ${nf.format(t.p.price)} = <b>${nf.format(t.amt)} GNF</b></span>
-        <span class="muted" style="font-size:.82rem">payé ${nf.format(t.paid)} · reste ${nf.format(t.amt-t.paid)}</span>
+        <span class="picto-note">${Math.round(t.q/t.p.qty*100)} % des ${nf.format(t.p.qty)} ${t.p.unit} reçus · 1 icône ≈ ${nf.format(per)} ${t.p.unit}</span>
+        ${t.ret?`<div class="picto-note" style="margin-top:4px">${retIcon}${nf.format(t.ret)} ${t.p.unit} rendus (non comptés ci-dessus)</div>`:''}</div>
+      <div class="money"><span>${nf.format(t.q)} × ${nf.format(t.p.price)} = <b>${nf.format(t.q*t.p.price)} GNF</b></span>
+        ${t.amt<t.q*t.p.price?`<span style="font-size:.82rem">avoir − ${nf.format(t.q*t.p.price-t.amt)} → <b>${nf.format(t.amt)}</b></span>`:''}
+        <span class="muted" style="font-size:.82rem">payé ${nf.format(t.paid)} · ${t.amt-t.paid<-1?`<span style="color:var(--ok)">crédit ${nf.format(t.paid-t.amt)}</span>`:'reste '+nf.format(t.amt-t.paid)}</span>
         <span class="chip ${tc}">${tl}</span></div></div>`}).join('');
   const others=Object.keys(byK[k.id]).filter(cid=>cid!==c.id).map(cid=>{const o=containers.find(x=>x.id===cid);
     return `<button type="button" class="cc go" data-c="${cid}"><i style="background:${o.color}"></i>${o.code}</button>`}).join('');
@@ -639,10 +679,11 @@ function renderPair(c,k){
     <div class="kpis">
       <div class="kpi"><span class="eyebrow">Montant</span><strong>${short(a.amount)}</strong><small>${gnf(a.amount)}</small></div>
       <div class="kpi"><span class="eyebrow">Payé</span><strong>${short(a.paid)}</strong><small>${Math.round(a.paid/a.amount*100)} % du montant</small></div>
-      <div class="kpi ${a.amount-a.paid>1?'loss':'good'}"><span class="eyebrow">Reste à payer</span><strong>${short(a.amount-a.paid)}</strong><small>${gnf(a.amount-a.paid)}</small></div>
+      <div class="kpi ${a.amount-a.paid>1?'loss':'good'}"><span class="eyebrow">${a.amount-a.paid<-1?'Crédit du client':'Reste à payer'}</span><strong>${short(Math.abs(a.amount-a.paid))}</strong><small>${a.amount-a.paid<-1?'à déduire d\'une prochaine facture':gnf(a.amount-a.paid)}</small></div>
       <div class="kpi"><span class="eyebrow">Part des ventes du conteneur</span><strong>${Math.round(a.amount/c.sales*100)} %</strong><small>sur ${short(c.sales)} vendus</small></div>
     </div>
     <div><h3 style="margin-bottom:10px">Produits pris dans ce conteneur</h3><div class="takes">${items}</div></div>
+    ${a.credits.length?`<div><h3 style="margin-bottom:8px">${retIcon}Retours et avoirs</h3>${a.credits.map(x=>{const [tc,tl]=typeLabel[x.type];return `<div class="supplier" style="margin-top:6px">${goodsHTML(kinds[x.p.name])}<b class="mono">${x.no}</b><span>${nf.format(x.q)} ${x.p.unit} · ${x.motif}</span><span class="chip ${tc}">${tl}</span><b class="num">− ${nf.format(x.amt)}</b><span class="muted">${x.onInvoice?'déduit de '+x.v.no:'crédit client'}</span></div>`}).join('')}</div>`:''}
     <div><h3 style="margin-bottom:8px">Factures</h3>${a.inv.map(v=>`<button type="button" class="cc go inv" data-no="${v.no}">${v.no} · ${fdate(v.date)}${v.cids.length>1?' · '+v.cids.length+' conteneurs':''}</button>`).join('')}</div>
     <div><h3 style="margin-bottom:8px">${k.name} a aussi reçu de</h3>${others||'<span class="muted">Aucun autre conteneur.</span>'}</div>`;
   $('#detail').querySelectorAll('.cc.go:not(.inv)').forEach(b=>b.onclick=()=>{if(!running)selectPair(b.dataset.c,k.id,state.from)});
@@ -653,9 +694,9 @@ function renderPair(c,k){
 const ccChip=c=>`<span class="cc"><i style="background:${c.color}"></i>${c.code.slice(5,11)}</span>`;
 const ageHTML=v=>v.due>1?`<div class="age ${v.age>30?'late':''}">${v.age} j${v.age>30?' · en retard':''}</div>`:'';
 function renderInvoices(){
-  const rows=invoices.map(v=>{const [cls,lab]=status(v.total,v.paid);
+  const rows=invoices.map(v=>{const [cls,lab]=status(v.net,v.paid);
     return `<tr class="click ${state.mode==='invoice'&&state.no===v.no?'on':''}" data-no="${v.no}" tabindex="0">
-      <td class="mono" style="white-space:nowrap">${v.no}<div class="age">${fdate(v.date)}</div></td>
+      <td class="mono" style="white-space:nowrap">${v.no}<div class="age">${fdate(v.date)}</div>${v.credits.map(x=>`<div class="age">${retIcon}${x.no}</div>`).join('')}</td>
       <td><div class="who">${avatarHTML(v.k.look)}<b style="font-weight:500">${v.k.name}</b></div></td>
       <td>${v.cids.map(cid=>ccChip(containers.find(c=>c.id===cid))).join('')}</td>
       <td class="r">${nf.format(v.total)}</td>
@@ -666,8 +707,18 @@ function renderInvoices(){
     const go=()=>{if(running)return;selectInvoice(tr.dataset.no);if(matchMedia('(max-width:1060px)').matches)$('#invoice').scrollIntoView({behavior:reduce?'auto':'smooth'})};tr.onclick=go;
     tr.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();go()}}});
 }
+function renderCredits(){
+  $('#atable').innerHTML=`<thead><tr><th>Avoir</th><th>Client</th><th>Produit · conteneur</th><th>Type</th><th class="r">Montant</th></tr></thead><tbody>${credits.map(x=>{const [tc,tl]=typeLabel[x.type];
+    return `<tr class="click" data-no="${x.v.no}" tabindex="0"><td class="mono" style="white-space:nowrap">${x.no}<div class="age">${fdate(x.date)} · ${x.v.no}</div></td>
+    <td><div class="who">${avatarHTML(x.k.look)}<b style="font-weight:500">${x.k.name}</b></div></td>
+    <td>${goodsHTML(kinds[x.p.name])}${nf.format(x.q)} ${x.p.unit} ${ccChip(x.c)}<div class="age">${x.motif}</div></td>
+    <td><span class="chip ${tc}">${tl}</span></td><td class="r">− ${nf.format(x.amt)}<div class="age">${x.onInvoice?'déduit de la facture':'crédit client'}</div></td></tr>`}).join('')}</tbody>`;
+  document.querySelectorAll('#atable tr.click').forEach(tr=>{tr.onclick=()=>{if(!running)selectInvoice(tr.dataset.no)};
+    tr.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();tr.onclick()}}});
+}
 function renderInvoice(v){
-  const [cls,lab]=status(v.total,v.paid);
+  const [cls,lab]=status(v.net,v.paid);
+  const crRows=v.credits.map(x=>`<tr><td class="muted">${retIcon}Avoir ${x.no} · ${nf.format(x.q)} ${x.p.unit} ${x.p.name.split(' ')[0].toLowerCase()}${x.onInvoice?'':' <b>(crédit client)</b>'}</td><td class="r">${x.onInvoice?'− '+nf.format(x.amt):'('+nf.format(x.amt)+')'}</td></tr>`).join('');
   const lines=v.lines.map(l=>`<tr><td>${goodsHTML(kinds[l.p.name])}${l.p.name}<br>${ccChip(l.c)}<span class="muted num">${nf.format(l.q)} ${l.p.unit} × ${nf.format(l.p.price)}</span></td><td class="r">${nf.format(l.amt)}</td></tr>`).join('');
   const pays=v.pays.length?v.pays.map(x=>`<div><span class="num">${fdate(x.date)}</span><span class="muted">${x.mode}</span><b class="num">${nf.format(x.amt)}</b></div>`).join(''):'<span class="muted">Aucun paiement reçu.</span>';
   $('#invoice').innerHTML=`<article class="paper" aria-label="Facture ${v.no}">
@@ -675,10 +726,11 @@ function renderInvoice(v){
     <div class="parties"><div><span class="eyebrow">Vendu par</span><br>Vous, l'importateur<br><span class="muted">Marché de Madina, Conakry</span></div>
       <div><span class="eyebrow">Vendu à</span><div class="who" style="margin-top:4px">${avatarHTML(v.k.look)}<div><b>${v.k.name}</b><br><span class="muted">${v.k.place}</span></div></div></div></div>
     <div class="tbl-wrap"><table><thead><tr><th>Produit · conteneur · qté × P.U.</th><th class="r">Montant</th></tr></thead><tbody>${lines}</tbody>
-      <tfoot><tr class="sum"><td>Total</td><td class="r">${nf.format(v.total)}</td></tr>
+      <tfoot><tr class="sum"><td>Total</td><td class="r">${nf.format(v.total)}</td></tr>${crRows}
       <tr><td class="muted">Payé</td><td class="r">${nf.format(v.paid)}</td></tr>
       <tr><td><b>Solde de facture</b></td><td class="r" style="${v.due>1?'color:var(--bad)':''};font-weight:600">${nf.format(v.due)} GNF</td></tr></tfoot></table></div>
     <div><h3 style="margin-bottom:8px">Paiements reçus</h3><div class="pays">${pays}</div></div>
+    ${v.credits.length?`<div><h3 style="margin-bottom:8px">${retIcon}Retours et avoirs</h3><div class="pays">${v.credits.map(x=>`<div><span class="num">${fdate(x.date)}</span><span class="muted">${x.no} · ${x.motif}${x.onInvoice?'':' · facture déjà payée : montant gardé en crédit pour le client'}</span><b class="num">− ${nf.format(x.amt)}</b></div>`).join('')}</div></div>`:''}
     <p class="muted" style="font-size:.78rem;margin:0">Notes / CGV : marchandise remise au magasin du client. Paiement attendu sous 30 jours.</p>
     <div class="sign"><span>Signature du client</span><span>Pour l'importateur</span></div>
   </article>`;
@@ -692,7 +744,7 @@ function renderReports(){
   const tot=B.reduce((s,b)=>s+b.sum,0);
   const oldest=[...open].sort((a,b)=>b.age-a.age).slice(0,5).map(v=>`<div class="hbar"><span><button type="button" class="link mono" data-no="${v.no}">${v.no}</button> · ${v.k.name}</span><span class="num">${short(v.due)} · <span class="age ${v.age>30?'late':''}">${v.age} j</span></span></div>`).join('');
   const topK=[...clients].sort((a,b)=>b.total-a.total).slice(0,5),maxK=topK[0].total;
-  const prods=containers.flatMap(c=>c.products.map((p,i)=>({c,p,sold:c.sold[i],amt:c.sold[i]*p.price}))).sort((a,b)=>b.amt-a.amt).slice(0,5),maxP=prods[0].amt;
+  const prods=containers.flatMap(c=>c.products.map((p,i)=>({c,p,sold:c.sold[i],amt:c.soldAmt[i]}))).sort((a,b)=>b.amt-a.amt).slice(0,5),maxP=prods[0].amt;
   $('#panel-r').innerHTML=`
     <section class="rcard" aria-label="Factures impayées par ancienneté"><h3>Impayés par ancienneté</h3>
       <p>Ce qui reste dû, selon l'âge de la facture (au ${fdate(TODAY)}).</p>
@@ -704,7 +756,10 @@ function renderReports(){
         <div class="track" style="width:${(k.total/maxK*100).toFixed(1)}%;display:flex"><span style="width:${(k.paid/k.total*100).toFixed(1)}%;background:var(--ok)"></span></div></div>`).join('')}</section>
     <section class="rcard" aria-label="Ventes par produit"><h3>Ventes par produit · top 5</h3><p>Couleur de la barre : conteneur d'origine.</p>
       ${prods.map(x=>`<div class="hbar"><span>${goodsHTML(kinds[x.p.name])}${x.p.name} ${ccChip(x.c)}</span><span class="num">${short(x.amt)}</span>
-        <div class="track" style="background:transparent"><span style="width:${(x.amt/maxP*100).toFixed(1)}%;background:${x.c.color}"></span></div></div>`).join('')}</section>`;
+        <div class="track" style="background:transparent"><span style="width:${(x.amt/maxP*100).toFixed(1)}%;background:${x.c.color}"></span></div></div>`).join('')}</section>
+    <section class="rcard" aria-label="Retours et avoirs"><h3>${retIcon}Retours et avoirs</h3><p>Avoirs émis : ${short(credits.reduce((s,x)=>s+x.amt,0))}, déduits des ventes des conteneurs.</p>
+      ${Object.entries(typeLabel).map(([t,[tc,tl]])=>{const xs=credits.filter(x=>x.type===t);return `<div class="hbar"><span><span class="chip ${tc}">${tl}</span> ${xs.length} avoir${xs.length>1?'s':''}</span><span class="num">− ${short(xs.reduce((s,x)=>s+x.amt,0))}</span></div>`}).join('')}
+      <p>Remis en stock : la marchandise peut être revendue. Rebut et avoir sans retour : perte pour le conteneur.</p></section>`;
   $('#panel-r').querySelectorAll('button[data-no]').forEach(b=>b.onclick=()=>{if(!running){selectInvoice(b.dataset.no);showTab('f')}});
 }
 
@@ -752,7 +807,7 @@ function selectPair(cid,kid,from){state={mode:'pair',cid,kid,from};lastC=cid;ren
   $('#steps').innerHTML=txt.map((t,i)=>`<div class="step"><svg viewBox="0 0 72 54" aria-hidden="true">${pics[i]}</svg><div><b><em>${i+1}</em>${t[0]}</b><span>${t[1]}</span></div></div>`).join('');
 })();
 
-renderList();renderDetail(containers[0]);renderClients();renderInvoices();renderInvoice(invByNo(lastInv));renderReports();renderCrumbs();
+renderList();renderDetail(containers[0]);renderClients();renderInvoices();renderCredits();renderInvoice(invByNo(lastInv));renderReports();renderCrumbs();
 $('#today').textContent=fdate(TODAY);
 intro();
 </script>

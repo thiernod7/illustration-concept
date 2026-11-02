@@ -66,9 +66,18 @@ Le client utilisait **Invoice Manager** (application mobile de facturation). La 
 | Dépenses | Coûts du conteneur : fret, dédouanement, manutention |
 | Rapports : factures impayées par client, facture vieillissante, ventes par client / par produit (top 5), profit et perte | Onglet **Rapports** : impayés par ancienneté (0–30, 31–60, 61–90, +90 j), top 5 clients, top 5 produits ; résultat par conteneur |
 | Aperçu PDF, signature client, notes / CGV, notes privées | Aperçu de facture avec signature et CGV (modèles PDF, logo : plus tard) |
-| Estimation, bon de commande, note de livraison, note de crédit, retours | Hors maquette ; à prévoir : retours et avoirs sur un conteneur |
+| Note de crédit, retour des ventes | **Avoir** `AV-2026-001` rattaché à une facture, une vente et donc un **conteneur** (voir « Retours et avoirs ») |
+| Estimation, bon de commande, note de livraison | Hors maquette |
 
-Ajouts au modèle de données : **Facture** (n°, client, date, lignes = ventes), **Paiement** (facture, date, montant, mode), **Fournisseur** (nom, montant versé), **Client.limite de crédit**.
+Ajouts au modèle de données : **Facture** (n°, client, date, lignes = ventes), **Paiement** (facture, date, montant, mode), **Fournisseur** (nom, montant versé), **Client.limite de crédit**, **Avoir** (n°, facture, vente, quantité, type, date, motif).
+
+## Retours et avoirs
+Un avoir porte sur une ligne de facture, donc sur un produit d'un conteneur. Montant = quantité × prix de la vente. Trois types :
+- **Repris · remis en stock** : la marchandise revient dans le conteneur. Vendu − q, stock + q, ventes − montant.
+- **Repris · mis au rebut** : la marchandise revient mais ne peut pas être revendue. Vendu − q, stock inchangé, ventes − montant (perte pour le conteneur).
+- **Avoir sans retour** (remise, marchandise abîmée gardée par le client) : quantités inchangées, ventes − montant.
+
+Imputation : si la facture n'est pas encore payée, l'avoir est **déduit de la facture** (solde = total − avoirs − payé). Si elle est déjà payée, il devient un **crédit client**, à déduire d'une prochaine facture ou à rembourser. Les ventes, le résultat et le stock des conteneurs sont toujours calculés **après avoirs**.
 
 ## Langue
 Toute l'interface et les textes sont en **français**.
